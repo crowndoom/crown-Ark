@@ -84,7 +84,7 @@ XoDos‑Ark ليس مجرد محاكٍ - إنه **وعاء من الخيال**. 
 
 يقف XoDos‑Ark على أكتاف عمالقة:
 
-- **[Termux](https://github.com/termux/termux-app)** – محاكي الطرفية وبيئة لينكس لأندرويد  
-- **[Termux:X11](https://github.com/termux/termux-x11)** – إضافة لتشغيل تطبيقات X11 بشكل أصلي  
-- **[Wayland](https://wayland.freedesktop.org/)** – بروتوكول العرض الحديث الذي يُمكّن التكامل الرسومي  
-- **[Trierarch](https://github.com/Beauty114514/trierarch/)** – سفينة مفتوحة المصدر مُلهمة
+- [Termux](https://github.com/termux/termux-app) – محاكي الطرفية وبيئة لينكس لأندرويد  
+- [Termux-X11](https://github.com/termux/termux-x11) – إضافة لتشغيل تطبيقات X11 بشكل أصلي  
+- [Wayland](https://wayland.freedesktop.org/) – بروتوكول العرض الحديث الذي يُمكّن التكامل الرسومي  
+- [Trierarch](https://github.com/Beauty114514/trierarch/) – سفينة مفتوحة المصدر مُلهمة
