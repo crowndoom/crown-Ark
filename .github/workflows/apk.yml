@@ -1,0 +1,167 @@
+name: Build xodosark APK and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:                          # ← renamed to match XoDos script
+        description: 'Version tag (e.g. 0.4.2)'
+        required: false
+        default: 'dev'
+  push:
+
+permissions:
+  contents: write                           # ← required to create releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_API: 34
+      NDK_VERSION: 27.1.12297006
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init submodules
+        run: git submodule update --init --recursive
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platform-tools" \
+                     "platforms;android-${ANDROID_API}" \
+                     "build-tools;34.0.0" \
+                     "ndk;${NDK_VERSION}" \
+                     "cmake;3.22.1"
+
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Build libxodos2.so
+        working-directory: xodosark-native
+        run: |
+          set -e
+          export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}
+
+          UNAME_S=$(uname -s | tr '[:upper:]' '[:lower:]')
+          UNAME_M=$(uname -m)
+          if [ "$UNAME_M" = "x86_64" ]; then
+            TOOLCHAIN_ARCH="x86_64"
+          else
+            TOOLCHAIN_ARCH="aarch64"
+          fi
+          NDK_HOST="${UNAME_S}-${TOOLCHAIN_ARCH}"
+          NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$NDK_HOST/bin"
+
+          export AR="$NDK_BIN/llvm-ar"
+          export CC="$NDK_BIN/aarch64-linux-android${ANDROID_API}-clang"
+          export CXX="$NDK_BIN/aarch64-linux-android${ANDROID_API}-clang++"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android${ANDROID_API}-clang"
+          export CARGO_TARGET_DIR="$PWD/target"
+
+          cargo build --release --target aarch64-linux-android
+
+          JNI_LIBS_DIR="../xodosark-app/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$JNI_LIBS_DIR"
+          cp -f target/aarch64-linux-android/release/libxodos2.so "$JNI_LIBS_DIR/"
+
+      # -----------------------------------------------
+      # Build RELEASE APK (instead of debug)
+      # -----------------------------------------------
+      - name: Build APK
+        working-directory: xodosark-app
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace    # ← changed to assembleRelease
+
+      # -----------------------------------------------
+      # Rename APK and compute MD5
+      # -----------------------------------------------
+      - name: Rename APK & generate MD5
+        id: md5
+        run: |
+          # Locate the built release APK (unsigned, unless signing keys are provided)
+          APK_FILE=$(ls xodosark-app/app/build/outputs/apk/release/*.apk | head -1)
+          TAG="${{ github.event.inputs.version_tag }}"
+          RELEASE_NAME="xodosark-${TAG}-arm64-v8a.apk"
+          cp "$APK_FILE" "$RELEASE_NAME"
+          md5sum "$RELEASE_NAME" > md5.txt
+
+          echo "apk_file=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          # store the whole md5 listing for the release body
+          {
+            echo "md5_list<<EOF"
+            cat md5.txt
+            echo "EOF"
+          } >> $GITHUB_ENV
+
+      # -----------------------------------------------
+      # Upload artifact (the renamed APK) – always
+      # -----------------------------------------------
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xodosark-apk-${{ github.event.inputs.version_tag || 'dev' }}
+          path: ${{ steps.md5.outputs.apk_file }}
+
+      # -----------------------------------------------
+      # Release steps – only on manual dispatch and if
+      # the version_tag is not 'dev'
+      # -----------------------------------------------
+      - name: Check if release exists
+        id: check_release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version_tag != 'dev'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ github.event.inputs.version_tag }}" &>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create new Release
+        if: steps.check_release.outcome == 'success' && steps.check_release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version_tag }}
+          name: XoDosArk ${{ github.event.inputs.version_tag }}
+          files: ${{ steps.md5.outputs.apk_file }}
+          prerelease: true
+          body: |
+            📱 XoDosArk APK
+
+            Version: ${{ github.event.inputs.version_tag }}
+
+            MD5:
+            ```
+            ${{ env.md5_list }}
+            ```
+
+      - name: Update existing Release (upload APK)
+        if: steps.check_release.outcome == 'success' && steps.check_release.outputs.exists == 'true'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version_tag }}
+          files: ${{ steps.md5.outputs.apk_file }}
+          overwrite: true   # replaces the previous APK asset with the same name

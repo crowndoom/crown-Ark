@@ -1,4 +1,4 @@
-name: Build xodosark APK
+name: Build xodosark APK cl
 
 on:
   workflow_dispatch:
