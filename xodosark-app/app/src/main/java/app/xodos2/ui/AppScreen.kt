@@ -619,11 +619,44 @@ fun openX11Settings() {
 
     
 suspend fun downloadAndExtractTurnipDrivers(containerIds: List<Int>) = withContext(Dispatchers.IO) {
-    
-      val baseUrl = "https://github.com/xodiosx/mesa-for-android-container/releases/download/mirror-turnip-26.2.0-devel-20260511"
-      val driversDir = File(context.filesDir, "drivers")
+    val baseUrl = "https://github.com/xodiosx/mesa-for-android-container/releases/download/mirror-turnip-26.2.0-devel-20260511"
+    val driversDir = File(context.filesDir, "drivers")
     driversDir.mkdirs()
 
+    // ---- Gl4es driver (shared, download once) ----
+    val gl4esName = "xodos-gl4es-driver.tar.xz"
+    val gl4esFile = File(driversDir, gl4esName)
+    val gl4esTmpFile = File(driversDir, "$gl4esName.tmp")
+
+    if (!gl4esFile.exists() || gl4esFile.length() == 0L) {
+        withContext(Dispatchers.Main) {
+            turnipDownloadProgress = 0 to "Downloading gl4es driver…"
+        }
+        gl4esTmpFile.delete()
+        try {
+            val url = URL("$baseUrl/$gl4esName")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connect()
+            connection.inputStream.use { input ->
+                gl4esTmpFile.outputStream().use { output ->
+                    val buffer = ByteArray(64 * 1024)
+                    var read: Int
+                    while (input.read(buffer).also { read = it } != -1) {
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+            if (gl4esTmpFile.length() == 0L) throw Exception("Gl4es download empty")
+            if (!gl4esTmpFile.renameTo(gl4esFile)) throw Exception("Failed to rename gl4es archive")
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                turnipDownloadProgress = -1 to "Gl4es download failed: ${e.message}"
+            }
+            return@withContext
+        }
+    }
+
+    // ---- Per‑container Turnip + gl4es ----
     for (id in containerIds) {
         val distro = DisplayOrchestrator.getContainerDistroType(context, id) ?: continue
         val assetName = "turnip_26.2.0-devel-20260511_${DisplayOrchestrator.turnipAssetPattern(distro)}_arm64.tar.gz"
@@ -631,29 +664,29 @@ suspend fun downloadAndExtractTurnipDrivers(containerIds: List<Int>) = withConte
         val destFile = File(driversDir, assetName)
         val tmpFile = File(driversDir, "$assetName.tmp")
 
-        // Skip if already have a complete file
+        // If Turnip archive already exists, just extract (and also extract gl4es)
         if (destFile.exists() && destFile.length() > 0) {
             withContext(Dispatchers.Main) {
-                turnipDownloadProgress = 80 to "Driver already downloaded, extracting..."
+                turnipDownloadProgress = 80 to "Turnip already downloaded, extracting…"
             }
             val ok = DisplayOrchestrator.extractTurnipDriver(context, id, distro)
+            if (ok) {
+                // Extract gl4es using the shared method
+                DisplayOrchestrator.extractDriverTarball(context, id, gl4esFile)
+            }
             withContext(Dispatchers.Main) {
                 turnipDownloadProgress = if (ok) 100 to "Done" else -1 to "Extraction failed"
             }
             continue
         }
 
-        // Remove any leftover .tmp file from previous attempt
         tmpFile.delete()
-
         withContext(Dispatchers.Main) { turnipDownloadInProgress = true }
         try {
             val url = URL(downloadUrl)
             val connection = url.openConnection() as HttpURLConnection
             connection.connect()
             val totalSize = connection.contentLengthLong
-
-            // Download to .tmp file
             connection.inputStream.use { input ->
                 tmpFile.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
@@ -664,31 +697,27 @@ suspend fun downloadAndExtractTurnipDrivers(containerIds: List<Int>) = withConte
                         bytesCopied += read
                         val pct = if (totalSize > 0) (bytesCopied * 100 / totalSize).toInt() else 0
                         withContext(Dispatchers.Main) {
-                            turnipDownloadProgress = pct to "Downloading driver for container $id..."
+                            turnipDownloadProgress = pct to "Downloading Turnip for container $id…"
                         }
                     }
                 }
             }
+            if (tmpFile.length() == 0L) throw Exception("Turnip download empty")
+            if (!tmpFile.renameTo(destFile)) throw Exception("Failed to rename Turnip archive")
 
-            // Verify download completed
-            if (tmpFile.length() == 0L) throw Exception("Downloaded file is empty")
-
-            // Rename .tmp to final name
-            if (!tmpFile.renameTo(destFile)) {
-                throw Exception("Failed to rename downloaded file")
+            withContext(Dispatchers.Main) { turnipDownloadProgress = 80 to "Extracting…" }
+            val turnipOk = DisplayOrchestrator.extractTurnipDriver(context, id, distro)
+            if (turnipOk) {
+                // Extract gl4es into the same container
+                DisplayOrchestrator.extractDriverTarball(context, id, gl4esFile)
             }
-
-            // Extract
-            withContext(Dispatchers.Main) { turnipDownloadProgress = 80 to "Extracting..." }
-            val ok = DisplayOrchestrator.extractTurnipDriver(context, id, distro)
             withContext(Dispatchers.Main) {
-                turnipDownloadProgress = if (ok) 100 to "Done" else -1 to "Extraction failed"
+                turnipDownloadProgress = if (turnipOk) 100 to "Done" else -1 to "Turnip extraction failed"
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
                 turnipDownloadProgress = -1 to "Download failed: ${e.message}"
             }
-            // Clean up failed download
             tmpFile.delete()
         } finally {
             withContext(Dispatchers.Main) {
@@ -700,7 +729,6 @@ suspend fun downloadAndExtractTurnipDrivers(containerIds: List<Int>) = withConte
         }
     }
 }
-
     // ----- native init and container check -----
     LaunchedEffect(Unit) {
         AppLogger.log("Starting native init and asset sync")

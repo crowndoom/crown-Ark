@@ -38,53 +38,75 @@ import app.xodos2.ui.runtime.NativeInstallCoordinator
 private fun buildDesktopInstallScript(distro: String, envName: String): String {
     val cleanDistro = distro.lowercase().trim()
     
-    // Resolve base dependencies safely per distribution architecture
+    // 1. Resolve base graphical dependencies securely
     val (managerCmd, baseDeps) = when {
         cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") || cleanDistro.contains("kali") || cleanDistro.contains("trisquel") -> {
             Pair(
                 "apt update && apt install -y",
-                "pulseaudio pavucontrol mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools"
+                "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11"
             )
         }
         cleanDistro.contains("arch") || cleanDistro.contains("manjaro") || cleanDistro.contains("artix") -> {
             Pair(
                 "pacman -Syu --noconfirm --needed",
-                "pulseaudio pavucontrol mesa-utils xorg-xwayland vulkan-devel mesa vulkan-tools"
+                "mesa-utils xorg-xwayland vulkan-devel mesa vulkan-tools dbus"
             )
         }
         cleanDistro.contains("fedora") || cleanDistro.contains("almalinux") || cleanDistro.contains("rocky") -> {
             Pair(
                 "dnf clean all && dnf install -y",
-                "pulseaudio pavucontrol mesa-utils xorg-x11-server-Xwayland vulkan-loader-devel mesa-dri-drivers vulkan-tools"
+                "mesa-utils xorg-x11-server-Xwayland vulkan-loader-devel mesa-dri-drivers vulkan-tools dbus-x11"
             )
         }
         cleanDistro.contains("alpine") -> {
             Pair(
                 "apk update && apk add",
-                "pulseaudio pavucontrol mesa-utils xwayland vulkan-loader mesa-dri-gallium vulkan-tools"
+                "mesa-utils xwayland vulkan-loader mesa-dri-gallium vulkan-tools dbus"
             )
         }
         cleanDistro.contains("void") -> {
             Pair(
                 "xbps-install -Su && xbps-install -y",
-                "pulseaudio pavucontrol mesa-utils xwayland vulkan-loader mesa-dri vulkan-tools"
+                "mesa-utils xwayland vulkan-loader mesa-dri vulkan-tools dbus"
             )
         }
         cleanDistro.contains("opensuse") -> {
             Pair(
                 "zypper refresh && zypper install -y",
-                "pulseaudio pavucontrol mesa-utils xorg-x11-server-Xwayland vulkan-devel mesa-dri-drivers vulkan-tools"
+                "mesa-utils xorg-x11-server-Xwayland vulkan-devel mesa-dri-drivers vulkan-tools dbus-1-x11"
             )
         }
         else -> { // Fallback safely to Debian-style names
             Pair(
                 "apt update && apt install -y",
-                "pulseaudio pavucontrol mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools"
+                "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11"
             )
         }
     }
 
-    // Resolve Desktop Environment specific package strings safely per distro
+    // 2. Resolve Audio Subsystem to prevent PipeWire vs PulseAudio conflicts
+    val isModernDE = envName == "GNOME" || envName == "KDE Plasma"
+    val audioDeps = if (isModernDE) {
+        when {
+            cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") || cleanDistro.contains("kali") -> 
+                "pipewire pipewire-pulse wireplumber pavucontrol"
+            cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> 
+                "pipewire-pulse wireplumber pavucontrol"
+            cleanDistro.contains("fedora") || cleanDistro.contains("almalinux") -> 
+                "pipewire-pulseaudio wireplumber pavucontrol"
+            cleanDistro.contains("alpine") -> 
+                "pipewire pipewire-pulse wireplumber pavucontrol"
+            cleanDistro.contains("void") -> 
+                "pipewire wireplumber pavucontrol"
+            cleanDistro.contains("opensuse") -> 
+                "pipewire-pulseaudio wireplumber pavucontrol"
+            else -> "pipewire pipewire-pulse pavucontrol"
+        }
+    } else {
+        "pulseaudio pavucontrol"
+    }
+
+    // 3. Resolve Desktop Environment specific package strings safely per distro
     val desktopPackages = when (envName) {
         "XFCE Desktop" -> when {
             cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "xfce4 xfce4-goodies"
@@ -93,7 +115,7 @@ private fun buildDesktopInstallScript(distro: String, envName: String): String {
         }
         "LXQt Desktop" -> when {
             cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "lxqt lxqt-themes featherpad"
-            cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") -> "lxqt openbox oxide-qt"
+            cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") -> "lxqt openbox"
             else -> "lxqt"
         }
         "KDE Plasma" -> when {
@@ -119,7 +141,7 @@ private fun buildDesktopInstallScript(distro: String, envName: String): String {
         else -> ""
     }
 
-    return "$managerCmd $desktopPackages $baseDeps\n" +
+    return "$managerCmd $desktopPackages $baseDeps $audioDeps\n" +
            "export PULSE_SERVER=127.0.0.1\n" +
            "echo 'Installation completed!'\n"
 }
@@ -177,6 +199,10 @@ fun ArchDrawerPage(
     var showDeleteConfirm by remember { mutableStateOf<Int?>(null) }
     val savedCommands = remember { mutableStateListOf<String>() }
 
+    // ===================== DE Script Editor State =====================
+    var editingDeName by remember { mutableStateOf<String?>(null) }
+    var deScriptText by remember { mutableStateOf("") }
+
     LaunchedEffect(showCommandsDialog) {
         if (showCommandsDialog) {
             savedCommands.clear()
@@ -189,7 +215,6 @@ fun ArchDrawerPage(
     }
 
     // ===================== Desktop environment list =====================
-    // Simple environment identifiers, package resolving is moved entirely to buildDesktopInstallScript
     val desktopEnvNames = remember {
         listOf("XFCE Desktop", "LXQt Desktop", "KDE Plasma", "GNOME", "MATE", "Cinnamon")
     }
@@ -347,26 +372,49 @@ fun ArchDrawerPage(
                 }
             }
 
-            // ===================== Install Desktop section (SMART FIXES APPLIED) =====================
+            // ===================== Install Desktop Section with Script Modification Features =====================
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                    val prefKey = "custom_install_script_${distroId}_${name.replace(" ", "_")}"
+                    
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                scope.launch { drawerState.close() }
-                                val script = buildDesktopInstallScript(distroId, name)
-                                onExecuteCommand(script)
-                            }
-                            .padding(vertical = 10.dp, horizontal = 12.dp)
-                    )
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    scope.launch { drawerState.close() }
+                                    // Load custom script from preference XML, fallback to hardcoded default template
+                                    val script = prefs.getString(prefKey, null) ?: buildDesktopInstallScript(distroId, name)
+                                    onExecuteCommand(script)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        )
+                        IconButton(
+                            onClick = {
+                                editingDeName = name
+                                deScriptText = prefs.getString(prefKey, null) ?: buildDesktopInstallScript(distroId, name)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Startup Script Package Setup",
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
 
-            // ===================== Commands button =====================
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Commands",
@@ -378,7 +426,6 @@ fun ArchDrawerPage(
                     .padding(vertical = 12.dp, horizontal = 12.dp)
             )
 
-            // Container Manager button
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Container Manager",
@@ -394,6 +441,56 @@ fun ArchDrawerPage(
             )
         }
     )
+
+    // ===================== Desktop Environment Script Editor Dialog =====================
+    if (editingDeName != null) {
+        val targetDe = editingDeName!!
+        val prefKey = "custom_install_script_${distroId}_${targetDe.replace(" ", "_")}"
+
+        AlertDialog(
+            onDismissRequest = { editingDeName = null },
+            title = { Text("Edit Setup Script: $targetDe") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = deScriptText,
+                        onValueChange = { deScriptText = it },
+                        label = { Text("Installation Sequence (.sh)") },
+                        singleLine = false,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 160.dp, max = 320.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        prefs.edit().putString(prefKey, deScriptText.trim()).apply()
+                        editingDeName = null
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            // Reset back to dynamic default package composition layout rules
+                            deScriptText = buildDesktopInstallScript(distroId, targetDe)
+                        }
+                    ) {
+                        Text("Reset", color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(onClick = { editingDeName = null }) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        )
+    }
 
     // ===================== Commands dialogs =====================
     if (showCommandsDialog) {
