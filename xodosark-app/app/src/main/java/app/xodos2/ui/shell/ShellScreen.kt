@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
@@ -53,8 +54,11 @@ fun ShellScreen(
     rendererSessionResetEpoch: Int,
     showKeyboardTrigger: Int,
     onKeyboardTriggerConsumed: () -> Unit = {},
+    activeSessionHasRootfs: Boolean = true,
+    isTerminalFront: Boolean = true, 
     onCloseCurrentSession: () -> Unit = {},
-    onExitRequested: () -> Unit = {},
+    onBackPressed: () -> Unit = {},      
+    onExitRequested: () -> Unit = {},    
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -70,21 +74,26 @@ fun ShellScreen(
 
     var showCloseSessionDialog by remember { mutableStateOf(false) }
 
-    // Close session confirmation dialog
+    // Close session / exit confirmation dialog
     if (showCloseSessionDialog) {
         AlertDialog(
             onDismissRequest = { showCloseSessionDialog = false },
             title = { Text("Close terminal") },
-            text = { Text("Are you sure you want to close this terminal session?") },
+            text = {
+                Text(
+                    if (terminalSessionIds.size <= 1) "Are you sure you want to exit?"
+                    else "Close current terminal session?"
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     showCloseSessionDialog = false
                     if (terminalSessionIds.size <= 1) {
-                        onExitRequested()
+                        onExitRequested()          // <-- uses onExitRequested
                     } else {
                         onCloseCurrentSession()
                     }
-                }) { Text("Close") }
+                }) { Text(if (terminalSessionIds.size <= 1) "Exit" else "Close") }
             },
             dismissButton = {
                 TextButton(onClick = { showCloseSessionDialog = false }) { Text("Cancel") }
@@ -95,7 +104,7 @@ fun ShellScreen(
     // ---------- Default text size and state ----------
     val defaultTextSizePx = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,
-        24f,
+        14f,
         context.resources.displayMetrics
     ).toInt().coerceAtLeast(1)
 
@@ -154,18 +163,17 @@ fun ShellScreen(
                 )
             }
 
-            // TerminalView setup
+            // ---------- TerminalView setup ----------
             val tv = TerminalView(ctx, null)
             val controller = ShellSessionController(ctx, tv)
             root.setTag(R.id.xodos2_shell_controller, controller)
 
             val viewClient = ShellViewClient(tv)
 
-            // ---------- Wrapped client to capture zoom changes ----------
+            // Wrapped client to capture zoom changes
             val wrappedClient = object : com.termux.view.TerminalViewClient by viewClient {
                 override fun onScale(scale: Float): Float {
                     val newScale = viewClient.onScale(scale)
-                    // Read the actual new text size from the public getter
                     currentTextSize = tv.mRenderer.getTextSizePx()
                     scheduleZoomSave()
                     return newScale
@@ -189,12 +197,13 @@ fun ShellScreen(
             tv.keepScreenOn = true
             tv.setBackgroundColor(android.graphics.Color.BLACK)
 
-            // Wrap terminal in a FrameLayout for the close button overlay
+            // Terminal inside a FrameLayout
             val terminalFrame = FrameLayout(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(0, 0, 1f).apply {
-                    width = ViewGroup.LayoutParams.MATCH_PARENT
-                    height = 0
-                }
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+                )
             }
 
             terminalFrame.addView(
@@ -205,36 +214,9 @@ fun ShellScreen(
                 )
             )
 
-            // Close button
-            val closeButton = TextView(ctx).apply {
-                text = "✕"
-                setTextColor(Color.WHITE)
-                textSize = 16f
-                setBackgroundColor(Color.argb(150, 0, 0, 0))
-                setPadding(12.dpToPx(ctx), 8.dpToPx(ctx), 12.dpToPx(ctx), 8.dpToPx(ctx))
-                gravity = Gravity.CENTER
-                isClickable = true
-                isFocusable = true
-            }
-
-            val closeBtnParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.END
-            ).apply {
-                setMargins(0, 6.dpToPx(ctx), 6.dpToPx(ctx), 0)
-            }
-            terminalFrame.addView(closeButton, closeBtnParams)
-
-            closeButton.setOnClickListener {
-                Handler(Looper.getMainLooper()).post {
-                    showCloseSessionDialog = true
-                }
-            }
-
             root.addView(terminalFrame)
 
-            // Extra keys bar
+            // ---------- Extra keys bar pinned to the bottom ----------
             val keysScroll = HorizontalScrollView(ctx).apply {
                 setBackgroundColor(Color.TRANSPARENT)
                 isHorizontalScrollBarEnabled = false
@@ -269,7 +251,6 @@ fun ShellScreen(
             controller.pruneSessionsExcept(terminalSessionIds.toSet())
             controller.attachSessionIfNeeded(activeSessionId)
 
-            // Navigate into the FrameLayout to find the TerminalView
             val terminalFrame = root.getChildAt(0) as FrameLayout
             val tv = terminalFrame.getChildAt(0) as TerminalView
 
@@ -285,15 +266,26 @@ fun ShellScreen(
                 }
                 onKeyboardTriggerConsumed()
             }
+
+            // Back button – now simply delegates to 
             tv.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_DOWN) {
-                    if (InputRouteState.lorieX11DisplayVisible) return@setOnKeyListener false
-                    onExitRequested()
-                    true
-                } else {
-                    false
-                }
-            }
+    if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+        if (!isTerminalFront) {
+            // Wayland / X11 / blackout → delegate to parent
+            onBackPressed()
+        } else if (activeSessionHasRootfs) {
+            // Terminal is front, container has rootfs → ask before closing
+            showCloseSessionDialog = true
+        } else {
+            // Terminal is front, no rootfs → exit directly
+            onExitRequested()
+        }
+        true
+    } else {
+        false
+    }
+}
+            
         }
     )
 }

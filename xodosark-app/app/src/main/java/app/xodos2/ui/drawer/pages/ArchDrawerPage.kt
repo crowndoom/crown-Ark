@@ -361,7 +361,7 @@ fun ArchDrawerPage(
                     )
                 } else {
                     Text(
-                        text = "Edit Arch X11 startup script",
+                        text = "Edit X11 startup script",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier

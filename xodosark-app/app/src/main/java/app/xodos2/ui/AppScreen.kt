@@ -154,7 +154,8 @@ object AppLogger {
 @Composable
 fun AppScreen(
     startInTerminal: Boolean = false,
-    onAppReady: () -> Unit = {}   // new parameter
+    onAppReady: () -> Unit = {}   
+    
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -276,8 +277,16 @@ val backupFilePicker = rememberLauncherForActivityResult(
 var wineScriptEditorOpen by remember { mutableStateOf(false) }   // ADD THIS LINE
     var terminalSessionState by remember { mutableStateOf(TerminalSessionController.initialState()) }
     var mouseMode by remember { mutableStateOf(MOUSE_MODE_TOUCHPAD) }
-    var resolutionPercent by remember { mutableStateOf(100) }
-    var scalePercent by remember { mutableStateOf(100) }
+var resolutionPercent by remember {
+    mutableIntStateOf(
+        prefs.getInt("resolution_percent", 100).coerceIn(10, 100)
+    )
+}
+var scalePercent by remember {
+    mutableIntStateOf(
+        prefs.getInt("scale_percent", 100).coerceIn(100, 1000).let { v -> ((v + 50) / 100) * 100 }
+    )
+}
     var showKeyboardTrigger by remember { mutableStateOf(0) }
     var keyboardWanted by remember { mutableStateOf(false) }
     var pendingAutoShowWayland by remember { mutableStateOf(false) }
@@ -298,6 +307,7 @@ var wineScriptEditorOpen by remember { mutableStateOf(false) }   // ADD THIS LIN
     val waylandRuntimeDir = remember(context) {
         File(context.filesDir, "usr/tmp").apply { mkdirs() }.absolutePath
     }
+    
     val desktopSocketName = "wayland-xodos2-desktop"
     var desktopServerId by remember { mutableStateOf(0L) }
     var launcherDefault by remember { mutableStateOf(AppPrefs.readLauncherDefault(prefs)) }
@@ -1670,28 +1680,59 @@ androidContent = {
             
         },
     ) {
+ 
+    val containerMask = NativeBridge.getInstalledContainersMask()
+val activeSessionHasRootfs = when (terminalSessionState.activeSessionId) {
+    TerminalSessionIds.ARCH_TERMINAL   -> (containerMask and 1) != 0
+    TerminalSessionIds.DEBIAN_TERMINAL -> (containerMask and 2) != 0
+    TerminalSessionIds.WINE_TERMINAL   -> (containerMask and 4) != 0
+    else -> false
+}   
+   val isTerminalFront = !showWayland && !showX11 && !desktopLaunchBlackout
+   
+val onShellBackPressed: () -> Unit = {
+    when {
+        InputRouteState.lorieX11DisplayVisible -> enterTerminal()
+        InputRouteState.waylandVisible -> enterTerminal()
+        desktopLaunchBlackout -> {
+            desktopLaunchBlackout = false
+            waylandVisible = false
+            pendingAutoShowWayland = false
+            uiMode = UiMode.TERMINAL
+        }
+        else -> showExitDialog = true
+    }
+}
         Box(modifier = Modifier.fillMaxSize()) {
-            ShellScreen(
+            
+
+ShellScreen(
     terminalFontKey = terminalFontKey,
     activeSessionId = terminalSessionState.activeSessionId,
     terminalSessionIds = terminalSessionState.sessionIds,
     rendererSessionResetEpoch = rendererSessionResetEpoch,
     showKeyboardTrigger = if (showWayland) 0 else showKeyboardTrigger,
+    activeSessionHasRootfs = activeSessionHasRootfs,
+    isTerminalFront = isTerminalFront,   // <-- correct parameter name
     onKeyboardTriggerConsumed = { showKeyboardTrigger = 0 },
     onCloseCurrentSession = {
-        // 1. Kill the native PTY of the current session
         NativeBridge.closeSession(terminalSessionState.activeSessionId)
-        // 2. Remove the session from the UI list & switch to the next available one
         terminalSessionState = TerminalSessionController.closeCurrentSession(terminalSessionState)
     },
-    onExitRequested = {
-        showExitDialog = true   // this variable must exist in AppScreen (see below)
-    },
-    modifier = Modifier.fillMaxSize().zIndex(0f),
+    onBackPressed = onShellBackPressed,
+    onExitRequested = { showExitDialog = true },
+    modifier = Modifier.fillMaxSize().zIndex(0f)
 )
+
             if (desktopLaunchBlackout) {
-                Box(modifier = Modifier.fillMaxSize().zIndex(1f).background(Color.Black))
-            }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(1f)
+            .background(Color.Black.copy(alpha = 0.45f))  // semi‑transparent
+    )
+}
+            
             if (showWayland) {
                 WaylandSurfaceView(
                     runtimeDir = waylandRuntimeDir,
