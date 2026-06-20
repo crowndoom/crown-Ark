@@ -270,6 +270,7 @@ val distFile = File(rootfs, ".rootfs_type")
         # XoDos-ark environment
         export WAYLAND_DISPLAY=wayland-xodos2
         export DISPLAY=:0
+        export MOZ_FAKE_NO_SANDBOX=1
         export DISTRO=$distroId
         source /etc/environment
     """.trimIndent()

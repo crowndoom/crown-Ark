@@ -287,6 +287,7 @@ pub(super) fn build_exec_args(
                 .context("PULSE_SERVER")?,
         );
         env.push(CString::new("XWAYLAND_NO_GLAMOR=1").unwrap());
+        env.push(CString::new("MOZ_FAKE_NO_SANDBOX=1").unwrap());
     }
 
     Ok((argv, env))
