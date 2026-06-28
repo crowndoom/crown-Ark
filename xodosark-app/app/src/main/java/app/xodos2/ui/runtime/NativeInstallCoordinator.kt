@@ -541,7 +541,7 @@ object NativeInstallCoordinator {
         )
         if (ok) {
             configureDns(context, containerId)      
-            copyAssetToContainer(context, containerId, "xfce4-fix.zip")       
+            //copyAssetToContainer(context, containerId, "xfce4-fix.zip")       
             val detected = detectDistroFromRootfs(context, containerId) ?: distro.distroType
             writeContainerEnvironment(context, containerId, detected)
             applyProotBypasses(context, containerId, detected)
@@ -591,7 +591,7 @@ object NativeInstallCoordinator {
 
         if (ok) {
             configureDns(context, containerId)
-            copyAssetToContainer(context, containerId, "xfce4-fix.zip") 
+            //copyAssetToContainer(context, containerId, "xfce4-fix.zip") 
             val detected = detectDistroFromRootfs(context, containerId) ?: "linux"
             writeContainerEnvironment(context, containerId, detected)
             applyProotBypasses(context, containerId, detected)
