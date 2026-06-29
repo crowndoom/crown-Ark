@@ -328,18 +328,37 @@ object DisplayOrchestrator {
     }
 
     fun turnipAssetPattern(distroType: String): String {
-        return when (distroType) {
-            "archlinux" -> "aarch64"
-            "debian" -> "debian_trixie"
-            "ubuntu" -> "ubuntu_noble"
-            "fedora" -> "fedora_43"
-            "alpine" -> "alpine_edge"
-            "void" -> "void"
-            "artix" -> "artix"
-            "trisquel" -> "trisquel"
-            else -> distroType
-        }
+    // Normalise distro type
+    val t = distroType.lowercase()
+    return when {
+        // Arch family
+        t == "archlinux" -> "aarch64"
+        t == "artix"     -> "aarch64"
+        t == "manjaro"   -> "aarch64"   // treat as Arch if no dedicated asset
+
+        // Debian family – everything goes to the same `debian` driver
+        t == "debian"       -> "debian_trixie"
+        t == "ubuntu"       -> "debian_trixie"
+        t == "trisquel"     -> "debian_trixie"
+        t == "deepin"       -> "debian_trixie"
+        t == "kali"         -> "debian_trixie"   // Kali is Debian‑based
+        t == "raspbian"     -> "debian_trixie"
+
+        // RPM family 
+        t == "fedora"       -> "edora_43"
+        t == "almalinux"    -> "edora_43"
+        t == "rocky"        -> "edora_43"
+
+        // Alpine
+        t == "alpine"       -> "debian_trixie"
+
+        // Void
+        t == "void"         -> "void"
+
+        // Fallback 
+        else -> "debian_trixie"   
     }
+}
 
     fun hasTurnipTarball(context: Context, distroType: String): Boolean {
         val pattern = turnipAssetPattern(distroType)

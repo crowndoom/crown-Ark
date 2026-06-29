@@ -63,6 +63,7 @@ import app.xodos2.wayland.WaylandSurfaceView
 import app.xodos2.ui.x11.EmbeddedX11Surface
 import com.termux.x11.EmbeddedX11Controller
 import com.termux.x11.X11OutputSettings
+import com.termux.x11.X11ServerService
 import java.io.File
 import java.io.FileWriter
 import java.io.PrintWriter
@@ -106,7 +107,14 @@ private fun x11ResolutionModeInternalForLabel(label: String): String = when (lab
 
 private val X11_CUSTOM_RESOLUTION_PATTERN: Pattern = Pattern.compile("^\\s*(\\d{2,4})\\s*x\\s*(\\d{2,4})\\s*\$")
 
-private enum class UiMode { TERMINAL, ARCH_WAYLAND_DESKTOP, DEBIAN_X11_DESKTOP }
+//private enum class UiMode { TERMINAL, ARCH_WAYLAND_DESKTOP, DEBIAN_X11_DESKTOP }
+private enum class UiMode {
+    TERMINAL,
+    ARCH_WAYLAND_DESKTOP,
+    DEBIAN_WAYLAND_DESKTOP,
+    WINE_WAYLAND_DESKTOP,
+    DEBIAN_X11_DESKTOP
+}
 private enum class DistroFetchState { LOADING, LOADED, ERROR }
 /**
  * Removes all leftover virgl payload directories (virgl.payload*)
@@ -268,13 +276,21 @@ val backupFilePicker = rememberLauncherForActivityResult(
     var menuOpen by remember { mutableStateOf(false) }
     var uiMode by remember(startInTerminal) { mutableStateOf(UiMode.TERMINAL) }
     var waylandVisible by remember { mutableStateOf(false) }
-    val showWayland = waylandVisible && uiMode != UiMode.TERMINAL
+  //  val showWayland = waylandVisible && uiMode != UiMode.TERMINAL
+    val showWayland = waylandVisible && uiMode != UiMode.TERMINAL && uiMode != UiMode.DEBIAN_X11_DESKTOP
     val showX11 = uiMode == UiMode.DEBIAN_X11_DESKTOP
     var settingsOpen by remember { mutableStateOf(false) }
     var waylandScriptEditorOpen by remember { mutableStateOf(false) }
     var x11ScriptEditorOpen by remember { mutableStateOf(false) }
  var archX11ScriptEditorOpen by remember { mutableStateOf(false) }   
-var wineScriptEditorOpen by remember { mutableStateOf(false) }   // ADD THIS LINE
+var wineScriptEditorOpen by remember { mutableStateOf(false) }  
+
+
+var debianX11ScriptEditorOpen by remember { mutableStateOf(false) }
+var wineX11ScriptEditorOpen by remember { mutableStateOf(false) }
+var debianWaylandScriptEditorOpen by remember { mutableStateOf(false) }
+var wineWaylandScriptEditorOpen by remember { mutableStateOf(false) }
+
     var terminalSessionState by remember { mutableStateOf(TerminalSessionController.initialState()) }
     var mouseMode by remember { mutableStateOf(MOUSE_MODE_TOUCHPAD) }
     var resolutionPercent by remember { mutableStateOf(100) }
@@ -535,10 +551,28 @@ fun prepareX11Backend() {
     }
 
 fun enterWineDesktop() {
-    // Start the X11 server (shared with Debian) if not already running
     X11Runtime.ensureX11ServerProcessStarted(context)
 
-    // Run the Wine desktop script using the Wine headless session
+    // ✅ Check if the Wine X11 session is already running
+    if (NativeBridge.isSessionAlive(TerminalSessionIds.WINE_X11_DISPLAY)) {
+        AppLogger.log("Wine X11 desktop already running – skipping startup script")
+        menuOpen = false
+        desktopLaunchBlackout = false
+        waylandVisible = false
+        pendingAutoShowWayland = false
+        uiMode = UiMode.TERMINAL
+        try {
+            val intent = Intent(context, com.termux.x11.MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to open X11 desktop", Toast.LENGTH_SHORT).show()
+        }
+        return
+    }
+
+    // Not running → launch the script
     DisplayOrchestrator.runWineX11DesktopStartupScript(
         context = context,
         prefs = prefs,
@@ -546,17 +580,14 @@ fun enterWineDesktop() {
         hasWineRootfs = hasContainer3,
     )
 
-    // Switch UI to X11 desktop mode (same mode as Debian)
     menuOpen = false
     desktopLaunchBlackout = false
     waylandVisible = false
     pendingAutoShowWayland = false
     PtyOutputRelay.setSessionIoLoggingEnabled(TerminalSessionIds.WINE_X11_DISPLAY, false)
+    uiMode = UiMode.TERMINAL
 
- //   uiMode = UiMode.DEBIAN_X11_DESKTOP   // reuse the X11 mode
-uiMode = UiMode.TERMINAL
-    
-       try {
+    try {
         val intent = Intent(context, com.termux.x11.MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -567,41 +598,67 @@ uiMode = UiMode.TERMINAL
     AppLogger.log("Entered Wine X11 desktop")
 }
 
-fun openX11Desktop() {
-    // 1. Ensure the X server is up (this starts X11ServerService if not already running)
-    X11Runtime.ensureX11ServerProcessStarted(context)
+fun enterDebianWaylandDesktop() {
+    // Prepare Wayland runtime + server (reuse if already created)
+    if (!DisplayOrchestrator.prepareWaylandRuntimeAndStartServer(context, waylandRuntimeDir)) {
+        menuOpen = false; return
+    }
+    if (desktopServerId == 0L) {
+        desktopServerId = try { WaylandBridge.nativeCreateServer(waylandRuntimeDir, desktopSocketName) } catch (_: Throwable) { 0L }
+    }
+    if (desktopServerId != 0L) { try { WaylandBridge.nativeSetActiveServer(desktopServerId) } catch (_: Throwable) {} }
+    try { WaylandBridge.nativeSetWmMode(WaylandBridge.WM_MODE_NESTED) } catch (_: Throwable) {}
 
-        menuOpen = false
-        desktopLaunchBlackout = false
-        PtyOutputRelay.setSessionIoLoggingEnabled(TerminalSessionIds.DEBIAN_X11_DISPLAY, false)
-        waylandVisible = false
-        pendingAutoShowWayland = false
-
-    
-        AppLogger.log("Entered  X11 desktop MainActivity")
-    //  Launch the full-screen Lorie activity
- uiMode = UiMode.TERMINAL
-    
-       try {
-        val intent = Intent(context, com.termux.x11.MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "Failed to open X11 desktop", Toast.LENGTH_SHORT).show()
+    // Use the interactive Debian terminal to run the script
+    val sessionId = TerminalSessionIds.DEBIAN_TERMINAL
+    if (!NativeBridge.isSessionAlive(sessionId)) {
+        NativeBridge.spawnSessionInRootfs(sessionId, 80, 24, TerminalSessionIds.rootfsKindForNativeId(sessionId))
     }
 
-    // 3. (Optional) If you still want to run the startup script automatically,
-    //    you can inject it here just like the old desktop enter functions.
-    //    For example:
-    //    DisplayOrchestrator.runDebianX11DesktopStartupScript(
-    //        context = context,
-    //        prefs = prefs,
-    //        headlessInjectHandler = headlessX11InjectHandler,
-    //        hasDebianRootfs = hasContainer2,
-    //    )
+    // Read the shared Wayland startup script (same key as Arch) and inject it
+    val script = prefs.getString("ddesktop_startup_script", "") ?: ""
+    if (script.isNotEmpty()) {
+        NativeBridge.writeInput(sessionId, "$script\n".toByteArray())
+    }
+
+    // UI state
+    desktopLaunchBlackout = true
+    pendingAutoShowWayland = true
+    PtyOutputRelay.setSessionIoLoggingEnabled(sessionId, false)
+    uiMode = UiMode.DEBIAN_WAYLAND_DESKTOP
+    waylandVisible = false
+    menuOpen = false
+    AppLogger.log("Entered Debian Wayland desktop")
 }
 
+fun enterWineWaylandDesktop() {
+    if (!DisplayOrchestrator.prepareWaylandRuntimeAndStartServer(context, waylandRuntimeDir)) {
+        menuOpen = false; return
+    }
+    if (desktopServerId == 0L) {
+        desktopServerId = try { WaylandBridge.nativeCreateServer(waylandRuntimeDir, desktopSocketName) } catch (_: Throwable) { 0L }
+    }
+    if (desktopServerId != 0L) { try { WaylandBridge.nativeSetActiveServer(desktopServerId) } catch (_: Throwable) {} }
+    try { WaylandBridge.nativeSetWmMode(WaylandBridge.WM_MODE_NESTED) } catch (_: Throwable) {}
+
+    val sessionId = TerminalSessionIds.WINE_TERMINAL
+    if (!NativeBridge.isSessionAlive(sessionId)) {
+        NativeBridge.spawnSessionInRootfs(sessionId, 80, 24, TerminalSessionIds.rootfsKindForNativeId(sessionId))
+    }
+
+    val script = prefs.getString("wdesktop_startup_script", "") ?: ""
+    if (script.isNotEmpty()) {
+        NativeBridge.writeInput(sessionId, "$script\n".toByteArray())
+    }
+
+    desktopLaunchBlackout = true
+    pendingAutoShowWayland = true
+    PtyOutputRelay.setSessionIoLoggingEnabled(sessionId, false)
+    uiMode = UiMode.WINE_WAYLAND_DESKTOP
+    waylandVisible = false
+    menuOpen = false
+    AppLogger.log("Entered Wine Wayland desktop")
+}
 
 fun openX11Settings() {
     try {
@@ -615,23 +672,43 @@ fun openX11Settings() {
 }
 
     fun enterDebianDesktop() {
-        X11Runtime.ensureX11ServerProcessStarted(context)
-        DisplayOrchestrator.runDebianX11DesktopStartupScript(
-            context = context,
-            prefs = prefs,
-            headlessInjectHandler = headlessX11InjectHandler,
-            hasDebianRootfs = hasDebianRootfs,
-        )
+    X11Runtime.ensureX11ServerProcessStarted(context)
+
+    //  Check if the Debian X11 session is already running
+    if (NativeBridge.isSessionAlive(TerminalSessionIds.DEBIAN_X11_DISPLAY)) {
+        AppLogger.log("Debian X11 desktop already running – skipping startup script")
         menuOpen = false
         desktopLaunchBlackout = false
-        PtyOutputRelay.setSessionIoLoggingEnabled(TerminalSessionIds.DEBIAN_X11_DISPLAY, false)
         waylandVisible = false
         pendingAutoShowWayland = false
-     //   uiMode = UiMode.DEBIAN_X11_DESKTOP
-     
-     uiMode = UiMode.TERMINAL
-    
-       try {
+        uiMode = UiMode.TERMINAL
+        try {
+            val intent = Intent(context, com.termux.x11.MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to open X11 desktop", Toast.LENGTH_SHORT).show()
+        }
+        return
+    }
+
+    // If not running, run the startup script as before
+    DisplayOrchestrator.runDebianX11DesktopStartupScript(
+        context = context,
+        prefs = prefs,
+        headlessInjectHandler = headlessX11InjectHandler,
+        hasDebianRootfs = hasContainer2,
+    )
+
+    menuOpen = false
+    desktopLaunchBlackout = false
+    PtyOutputRelay.setSessionIoLoggingEnabled(TerminalSessionIds.DEBIAN_X11_DISPLAY, false)
+    waylandVisible = false
+    pendingAutoShowWayland = false
+    uiMode = UiMode.TERMINAL
+
+    try {
         val intent = Intent(context, com.termux.x11.MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -639,8 +716,8 @@ fun openX11Settings() {
     } catch (e: Exception) {
         Toast.makeText(context, "Failed to open X11 desktop", Toast.LENGTH_SHORT).show()
     }
-        AppLogger.log("Entered Debian X11 desktop")
-    }
+    AppLogger.log("Entered Debian X11 desktop")
+}
 
     fun cycleLauncherDefault() {
         launcherDefault = AppPrefs.cycleLauncherDefaultPref(launcherDefault)
@@ -864,7 +941,12 @@ File(context.filesDir, "drivers").listFiles { f ->
     LaunchedEffect(pendingAutoShowWayland) {
         if (!pendingAutoShowWayland) return@LaunchedEffect
         WaylandVisibilityCoordinator.waitUntilDesktopClientReady(
-            isStillPending = { pendingAutoShowWayland && uiMode == UiMode.ARCH_WAYLAND_DESKTOP && !waylandVisible },
+          //  isStillPending = { pendingAutoShowWayland && uiMode == UiMode.ARCH_WAYLAND_DESKTOP && !waylandVisible },
+            isStillPending = {
+    pendingAutoShowWayland &&
+    (uiMode == UiMode.ARCH_WAYLAND_DESKTOP || uiMode == UiMode.DEBIAN_WAYLAND_DESKTOP || uiMode == UiMode.WINE_WAYLAND_DESKTOP) &&
+    !waylandVisible
+},
             hasActiveClients = { WaylandBridge.nativeHasActiveClients() },
             onReady = {
                 waylandVisible = true
@@ -1439,9 +1521,16 @@ if (showExitDialog) {
         text = { Text("Are you sure you want to exit?") },
         confirmButton = {
             TextButton(onClick = {
-                showExitDialog = false
-               System.exit(0)
-            }) { Text("Yes") }
+    showExitDialog = false
+    // 1. Stop the X11 server service
+    val x11Intent = Intent(context, X11ServerService::class.java)
+    context.stopService(x11Intent)
+
+    // 2. the entire app process, just like Android’s Force Stop
+    //    finishAffinity() ensures all activities are removed from the stack
+    (context as? Activity)?.finishAffinity()
+    System.exit(0)
+}) { Text("Yes") }
         },
         dismissButton = {
             TextButton(onClick = { showExitDialog = false }) { Text("No") }
@@ -1687,124 +1776,190 @@ if (showDistroSelection) {
       
 
             DrawerPagedHost(
-                archContent = {
-                    ArchDrawerPage(
-                        prefs = prefs,
-                        drawerState = drawerState,
-                        scope = scope,
-                        terminalFontKey = terminalFontKey,
-                        terminalSessionState = terminalSessionState,
-                        launcherDefault = launcherDefault,
-                        desktopVulkanMode = desktopVulkanMode,
-                        desktopOpenGLMode = desktopOpenGLMode,
-                        mouseMode = mouseMode,
-                        resolutionPercent = resolutionPercent,
-                        scalePercent = scalePercent,
-                        waylandScriptEditorOpen = waylandScriptEditorOpen,
-                        archX11ScriptEditorOpen = archX11ScriptEditorOpen,
-                        onRequestKeyboard = { requestKeyboard() },
-        onArchX11ScriptEditorOpenChange = { archX11ScriptEditorOpen = it },
-        onEnterArchX11Desktop = { enterArchX11Desktop() },
-                        onWaylandScriptEditorOpenChange = { waylandScriptEditorOpen = it },
-                        onEnterWaylandDesktop = { enterArchWaylandDesktop() },
-                        onEnterTerminal = { enterTerminal() },
-                        onLauncherDefaultSelect = { setLauncherDefaultFromMenuLabel(it) },
-                        onDesktopVulkanSelect = { setDesktopVulkanMode(it) },
-                        onDesktopOpenGLSelect = { setDesktopOpenGLMode(it) },
-                        onTerminalFontSelectLabel = { label ->
-                            val id = ShellFonts.options.find { it.label == label }?.id ?: ShellFonts.DEFAULT_ID
-                            persistTerminalFont(id)
-                        },
-                        onTerminalSessionStateChange = { terminalSessionState = it },
-                        onExecuteCommand = { cmd ->
-    NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
-},
-                        onMouseModeSelectLabel = { label ->
-                            persistMouseMode(if (label == "Tablet") MOUSE_MODE_TABLET else MOUSE_MODE_TOUCHPAD)
-                        },
-                        onResolutionPercentSelectLabel = { label ->
-                            val pct = label.removeSuffix("%").trim().toIntOrNull()
-                            if (pct != null) persistResolutionPercent(pct)
-                        },
-                        onScalePercentSelectLabel = { label ->
-                            val pct = label.removeSuffix("%").trim().toIntOrNull()
-                            if (pct != null) persistScalePercent(pct)
-                        },
-                        vulkanOptions = VULKAN_MODES,
-                        openGLOptions = when (desktopVulkanMode) {
-    "TURNIP" -> listOf("ZINK", "GL4ES")
-    "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
-    else     -> OPENGL_MODES
-},
-                        hasArchRootfs = hasContainer1,     
-                        onContainerManagerClick = {               
-            scope.launch { drawerState.close() }
-            showContainerManager = true
-        }
-                    )
-                },
-                debianContent = {
-    DebianDrawerPage(
-        prefs = prefs,
-        drawerState = drawerState,
-        scope = scope,
-        terminalSessionState = terminalSessionState,
-        onTerminalSessionStateChange = { terminalSessionState = it },
-        x11ScriptEditorOpen = x11ScriptEditorOpen,
-        onX11ScriptEditorOpenChange = { x11ScriptEditorOpen = it },
-        onOpenX11Settings = { openX11Settings() },
-        onEnterDebianDesktop = { enterDebianDesktop() },
-        onEnterTerminal = { enterTerminal() },
-        onExitDisplayModes = {
-            uiMode = UiMode.TERMINAL
-            waylandVisible = false
-            pendingAutoShowWayland = false
-        },
-        hasDebianRootfs = hasContainer2,
-        onContainerManagerClick = {
-            scope.launch { drawerState.close() }
-            showContainerManager = true
-        },
-        onExecuteCommand = { cmd ->
-    NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
-},
-    )
-},
+    archContent = {
+        ArchDrawerPage(
+            prefs = prefs,
+            drawerState = drawerState,
+            scope = scope,
+            terminalFontKey = terminalFontKey,
+            terminalSessionState = terminalSessionState,
+            launcherDefault = launcherDefault,
+            desktopVulkanMode = desktopVulkanMode,
+            desktopOpenGLMode = desktopOpenGLMode,
+            mouseMode = mouseMode,
+            resolutionPercent = resolutionPercent,
+            scalePercent = scalePercent,
+            waylandScriptEditorOpen = waylandScriptEditorOpen,
+            archX11ScriptEditorOpen = archX11ScriptEditorOpen,
+            onRequestKeyboard = { requestKeyboard() },
+            onArchX11ScriptEditorOpenChange = { archX11ScriptEditorOpen = it },
+            onEnterArchX11Desktop = { enterArchX11Desktop() },
+            onWaylandScriptEditorOpenChange = { waylandScriptEditorOpen = it },
+            onEnterWaylandDesktop = { enterArchWaylandDesktop() },
+            onEnterTerminal = { enterTerminal() },
+            onLauncherDefaultSelect = { setLauncherDefaultFromMenuLabel(it) },
+            onDesktopVulkanSelect = { setDesktopVulkanMode(it) },
+            onDesktopOpenGLSelect = { setDesktopOpenGLMode(it) },
+            onTerminalFontSelectLabel = { label ->
+                val id = ShellFonts.options.find { it.label == label }?.id ?: ShellFonts.DEFAULT_ID
+                persistTerminalFont(id)
+            },
+            onTerminalSessionStateChange = { terminalSessionState = it },
+            onExecuteCommand = { cmd ->
+                NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
+            },
+            onMouseModeSelectLabel = { label ->
+                persistMouseMode(if (label == "Tablet") MOUSE_MODE_TABLET else MOUSE_MODE_TOUCHPAD)
+            },
+            onResolutionPercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistResolutionPercent(pct)
+            },
+            onScalePercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistScalePercent(pct)
+            },
+            vulkanOptions = VULKAN_MODES,
+            openGLOptions = when (desktopVulkanMode) {
+                "TURNIP" -> listOf("ZINK", "GL4ES")
+                "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
+                else     -> OPENGL_MODES
+            },
+            hasArchRootfs = hasContainer1,
+            onContainerManagerClick = {
+                scope.launch { drawerState.close() }
+                showContainerManager = true
+            }
+        )
+    },
 
-androidContent = {
-    WineDrawerPage(
-        prefs = prefs,
-        drawerState = drawerState,
-        scope = scope,
-        terminalSessionState = terminalSessionState,
-        onTerminalSessionStateChange = { terminalSessionState = it },
-        wineScriptEditorOpen = wineScriptEditorOpen,   // you’ll need to add this state
-        onWineScriptEditorOpenChange = { wineScriptEditorOpen = it },
-        onEnterWineDesktop = { enterWineDesktop() },
-        onEnterTerminal = { enterTerminal() },
-        onExitDisplayModes = {
-            uiMode = UiMode.TERMINAL
-            waylandVisible = false
-            pendingAutoShowWayland = false
-        },
-        hasWineRootfs = hasContainer3,
-        onContainerManagerClick = {
-            scope.launch { drawerState.close() }
-            showContainerManager = true
-        },
-        onExecuteCommand = { cmd ->
-    NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
-},
-    )
-},
-                
-                
-                
-                
-            )
+    // ─── Debian Drawer (Container 2) ──────────────────────────
+    debianContent = {
+        DebianDrawerPage(
+            // ── mandatory first three parameters ──
+            debianX11ScriptEditorOpen = debianX11ScriptEditorOpen,
+            onDebianX11ScriptEditorOpenChange = { debianX11ScriptEditorOpen = it },
+            onEnterDebianX11Desktop = { enterDebianDesktop() },   // existing function
+
+            prefs = prefs,
+            drawerState = drawerState,
+            scope = scope,
+            terminalFontKey = terminalFontKey,
+            terminalSessionState = terminalSessionState,
+            launcherDefault = launcherDefault,
+            desktopVulkanMode = desktopVulkanMode,
+            desktopOpenGLMode = desktopOpenGLMode,
+            mouseMode = mouseMode,
+            resolutionPercent = resolutionPercent,
+            scalePercent = scalePercent,
+            waylandScriptEditorOpen = debianWaylandScriptEditorOpen,     
+            onWaylandScriptEditorOpenChange = { debianWaylandScriptEditorOpen = it },
+            onEnterDebianWaylandDesktop = { enterDebianWaylandDesktop() },
+            onEnterTerminal = { enterTerminal() },
+            onLauncherDefaultSelect = { setLauncherDefaultFromMenuLabel(it) },
+            onDesktopVulkanSelect = { setDesktopVulkanMode(it) },
+            onDesktopOpenGLSelect = { setDesktopOpenGLMode(it) },
+            onTerminalFontSelectLabel = { label ->
+                val id = ShellFonts.options.find { it.label == label }?.id ?: ShellFonts.DEFAULT_ID
+                persistTerminalFont(id)
+            },
+            onTerminalSessionStateChange = { terminalSessionState = it },
+            onMouseModeSelectLabel = { label ->
+                persistMouseMode(if (label == "Tablet") MOUSE_MODE_TABLET else MOUSE_MODE_TOUCHPAD)
+            },
+            onResolutionPercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistResolutionPercent(pct)
+            },
+            onScalePercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistScalePercent(pct)
+            },
+            vulkanOptions = VULKAN_MODES,
+            openGLOptions = when (desktopVulkanMode) {
+                "TURNIP" -> listOf("ZINK", "GL4ES")
+                "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
+                else     -> OPENGL_MODES
+            },
+            hasDebianRootfs = hasContainer2,
+            onContainerManagerClick = {
+                scope.launch { drawerState.close() }
+                showContainerManager = true
+            },
+            onRequestKeyboard = { requestKeyboard() },
+            onExecuteCommand = { cmd ->
+                NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
+            }
+        )
+    },
+
+    // ─── Wine Drawer (Container 3) ────────────────────────────
+    androidContent = {
+        WineDrawerPage(
+            // ── mandatory first three parameters ──
+            wineX11ScriptEditorOpen = wineX11ScriptEditorOpen,
+            onWineX11ScriptEditorOpenChange = { wineX11ScriptEditorOpen = it },
+            onEnterWineX11Desktop = { enterWineDesktop() },   // existing function
+
+            prefs = prefs,
+            drawerState = drawerState,
+            scope = scope,
+            terminalFontKey = terminalFontKey,
+            terminalSessionState = terminalSessionState,
+            launcherDefault = launcherDefault,
+            desktopVulkanMode = desktopVulkanMode,
+            desktopOpenGLMode = desktopOpenGLMode,
+            mouseMode = mouseMode,
+            resolutionPercent = resolutionPercent,
+            scalePercent = scalePercent,
+            waylandScriptEditorOpen = wineWaylandScriptEditorOpen,   
+            onWaylandScriptEditorOpenChange = { wineWaylandScriptEditorOpen = it },
+            onEnterWineWaylandDesktop = { enterWineWaylandDesktop() },
+            onEnterTerminal = { enterTerminal() },
+            onLauncherDefaultSelect = { setLauncherDefaultFromMenuLabel(it) },
+            onDesktopVulkanSelect = { setDesktopVulkanMode(it) },
+            onDesktopOpenGLSelect = { setDesktopOpenGLMode(it) },
+            onTerminalFontSelectLabel = { label ->
+                val id = ShellFonts.options.find { it.label == label }?.id ?: ShellFonts.DEFAULT_ID
+                persistTerminalFont(id)
+            },
+            onTerminalSessionStateChange = { terminalSessionState = it },
+            onMouseModeSelectLabel = { label ->
+                persistMouseMode(if (label == "Tablet") MOUSE_MODE_TABLET else MOUSE_MODE_TOUCHPAD)
+            },
+            onResolutionPercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistResolutionPercent(pct)
+            },
+            onScalePercentSelectLabel = { label ->
+                val pct = label.removeSuffix("%").trim().toIntOrNull()
+                if (pct != null) persistScalePercent(pct)
+            },
+            vulkanOptions = VULKAN_MODES,
+            openGLOptions = when (desktopVulkanMode) {
+                "TURNIP" -> listOf("ZINK", "GL4ES")
+                "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
+                else     -> OPENGL_MODES
+            },
+            hasWineRootfs = hasContainer3,
+            onContainerManagerClick = {
+                scope.launch { drawerState.close() }
+                showContainerManager = true
+            },
+            onRequestKeyboard = { requestKeyboard() },
+            onExecuteCommand = { cmd ->
+                NativeBridge.writeInput(terminalSessionState.activeSessionId, "$cmd\n".toByteArray())
+            }
+        )
+    }
+)
             
             
         },
+        
+        
+        
+        
     ) {
  
     val containerMask = NativeBridge.getInstalledContainersMask()

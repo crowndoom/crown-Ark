@@ -34,12 +34,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 // ----------------------------------------------------------------
-// Data class for saved commands with title
+// Data class for saved commands with title is now in CommandsModels.kt
 // ----------------------------------------------------------------
-private data class SavedCommand(
-    val title: String,
-    val command: String
-)
 
 // ----------------------------------------------------------------
 // ArchDrawerPage composable
