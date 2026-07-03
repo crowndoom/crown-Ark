@@ -81,6 +81,8 @@ import java.net.HttpURLConnection
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
+import android.view.WindowManager
+
 private val VULKAN_MODES = listOf("LLVMPIPE", "VENUS", "TURNIP")
 private val OPENGL_MODES = listOf("LLVMPIPE", "VIRGL", "ZINK", "GL4ES")
 
@@ -168,6 +170,10 @@ fun AppScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember(context) { context.getSharedPreferences("xodos2_prefs", 0) }
+// Keep screen on always while the app is in the foreground
+LaunchedEffect(Unit) {
+    (context as? Activity)?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+}    
 var showExitDialog by remember { mutableStateOf(false) }
     // ----- storage permission -----
     var storagePermissionGranted by remember { mutableStateOf(false) }
