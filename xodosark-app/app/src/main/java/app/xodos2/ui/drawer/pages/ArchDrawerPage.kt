@@ -292,6 +292,13 @@ fun ArchDrawerPage(
                 }
             }
 
+
+DesktopLaunchersSection(
+        containerId = 1,                     // or 2 for Debian, 3 for Wine
+        prefs = prefs,
+        onExecuteCommand = onExecuteCommand
+    )
+
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
                     val prefKey = "custom_install_script_${distroId}_${name.replace(" ", "_")}"

@@ -21,7 +21,7 @@ object DesktopInstallScripts {
                     "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip")
             cleanDistro.contains("arch") || cleanDistro.contains("manjaro") || cleanDistro.contains("artix") ->
                 Pair("pacman -Syu --noconfirm --needed",
-                    "mesa-utils xorg-xwayland vulkan-devel mesa vulkan-tools dbus")
+                    "mesa-utils xorg-server xorg-xwayland vulkan-devel mesa vulkan-tools dbus")
             cleanDistro.contains("fedora") || cleanDistro.contains("almalinux") || cleanDistro.contains("rocky") ->
                 Pair("dnf upgrade -y && dnf install -y",
                     "mesa-utils xorg-x11-server-Xwayland vulkan-loader-devel mesa-dri-drivers vulkan-tools dbus-x11 zip unzip")
@@ -39,7 +39,6 @@ object DesktopInstallScripts {
                     "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip")
         }
 
-       // ─── Kali‑specific setup (improved) ───
         // ─── Kali‑specific setup (improved) ───
         val gpgSetup = if (cleanDistro.contains("kali")) {
             """
@@ -140,7 +139,7 @@ echo "Kali base environment aligned."
                 else -> "lxqt"
             }
             "KDE Plasma" -> when {
-                cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "plasma-desktop kde-applications"
+                cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "plasma-meta dolphin konsole plasma-x11-session kwin-x11"
                 cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") -> "kde-plasma-desktop"
                 cleanDistro.contains("fedora") -> "@kde-desktop"
                 else -> "plasma-desktop"
@@ -162,23 +161,46 @@ echo "Kali base environment aligned."
             else -> ""
         }
 
+        // KDE kwin PRoot downgrade fix for Arch
+        val kdeArchProotFix = if (envName == "KDE Plasma" && (cleanDistro.contains("arch") || cleanDistro.contains("manjaro"))) {
+            """
+                echo "Downgrading kwin to fix PRoot Wayland crashing bug..."
+                pacman -U --noconfirm https://pkgmirror.sametimetomorrow.net/aarch64/packages/k/kwin/kwin-6.6.5-4-aarch64.pkg.tar.xz
+                echo "kwin successfully downgraded."
+            """.trimIndent() + "\n"
+        } else ""
+
         // Build script body
         var scriptBody = gpgSetup +
                 "$managerCmd $desktopPackages $baseDeps $audioDeps\n" +
+                kdeArchProotFix +
                 "export PULSE_SERVER=127.0.0.1\n" +
                 libc6Setup +
                 "echo 'Installation completed!'\n"
 
-        // XFCE fix for Debian‑based
-        if (envName == "XFCE Desktop" &&
+        // gnome fix for Debian‑based
+        if (envName == "GNOME" &&
             (cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") ||
              cleanDistro.contains("kali") || cleanDistro.contains("trisquel"))) {
             scriptBody += """
-                # Apply xfce4-fix
-                echo 'no need x11 fixed '
-                
+                # Apply GNOME
+               rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service
+                echo 'fixed try using those commands to start desktop'
+                rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service
+
+killall -9 gnome-session-binary dbus-daemon dbus-launch metacity gnome-panel 2>/dev/null
+rm -f /run/dbus/pid && mkdir -p /run/dbus && dbus-daemon --system --fork
+
+export XDG_CURRENT_DESKTOP=GNOME
+export DESKTOP_SESSION=gnome
+export XDG_SESSION_DESKTOP=gnome
+
+#dbus-run-session gnome-shell  --x11
+
             """.trimIndent() + "\n"
         }
+
+
 
         // Always wrap in a heredoc
         return "sh <<'EOF'\n${scriptBody}\nEOF"

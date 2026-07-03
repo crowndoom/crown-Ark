@@ -231,6 +231,12 @@ fun DebianDrawerPage(
                     )
                 }
             }
+            
+            DesktopLaunchersSection(
+        containerId = 3,                     
+        prefs = prefs,
+        onExecuteCommand = onExecuteCommand
+    )
 
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
