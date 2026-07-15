@@ -968,23 +968,22 @@ fun downloadBootstrapArchive() {
         bootstrapDownloadProgress = 0 to "Starting download…"
 
         try {
-            val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/extra-0.1/extra.tar.xz")   
-            val connection = withContext(Dispatchers.IO) {
-                url.openConnection() as HttpURLConnection
-            }
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 15_000
-            connection.connect()
-
-            val totalSize = connection.contentLengthLong
-            val inputStream = connection.inputStream
-
-            // Save to /sdcard/Download
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!downloadsDir.exists()) downloadsDir.mkdirs()
-            val outputFile = File(downloadsDir, "extra.tar.xz")
-
             withContext(Dispatchers.IO) {
+                val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/extra-0.1/extra.tar.xz")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 15_000
+                connection.instanceFollowRedirects = true
+                connection.setRequestProperty("User-Agent", "XoDosArk/1.0")
+                connection.connect()
+
+                val totalSize = connection.contentLengthLong
+                val inputStream = connection.inputStream
+
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                val outputFile = File(downloadsDir, "extra.tar.xz")
+
                 inputStream.use { input ->
                     outputFile.outputStream().use { output ->
                         val buffer = ByteArray(64 * 1024)
@@ -1002,13 +1001,14 @@ fun downloadBootstrapArchive() {
                         }
                     }
                 }
-            }
 
-            withContext(Dispatchers.Main) {
-                bootstrapDownloadProgress = 100 to "Download complete"
-                Toast.makeText(context, "Extra drivers archive saved to Downloads", Toast.LENGTH_LONG).show()
+                withContext(Dispatchers.Main) {
+                    bootstrapDownloadProgress = 100 to "Download complete"
+                    Toast.makeText(context, "Extra drivers archive saved to Downloads", Toast.LENGTH_LONG).show()
+                }
             }
         } catch (e: Exception) {
+            Log.e("BootstrapDownload", "Download failed", e)   // for debugging
             withContext(Dispatchers.Main) {
                 bootstrapDownloadProgress = -1 to "Download failed: ${e.message}"
                 Toast.makeText(context, "Extra drivers download failed", Toast.LENGTH_LONG).show()
@@ -1020,7 +1020,6 @@ fun downloadBootstrapArchive() {
         }
     }
 }
-
 
     // ----- native init and container check -----
     LaunchedEffect(Unit) {
