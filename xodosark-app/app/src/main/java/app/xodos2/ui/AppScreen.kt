@@ -2268,7 +2268,7 @@ if (showDistroSelection) {
             },
             vulkanOptions = VULKAN_MODES,
             openGLOptions = when (desktopVulkanMode) {
-                "TURNIP" -> listOf("ZINK", "GL4ES")
+                "TURNIP" -> listOf("ZINK", "VIRGL", "GL4ES")
                 "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
                 else     -> OPENGL_MODES
             },
@@ -2328,7 +2328,7 @@ if (showDistroSelection) {
             },
             vulkanOptions = VULKAN_MODES,
             openGLOptions = when (desktopVulkanMode) {
-                "TURNIP" -> listOf("ZINK", "GL4ES")
+                "TURNIP" -> listOf("ZINK", "VIRGL", "GL4ES")
                 "VENUS"  -> listOf("LLVMPIPE", "VIRGL", "ZINK")
                 else     -> OPENGL_MODES
             },

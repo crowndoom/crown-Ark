@@ -80,7 +80,7 @@ object DisplayOrchestrator {
             graphicsEnv.lines().filter { it.isNotBlank() }.forEach { line ->
                 val parts = line.split("=", limit = 2)
                 if (parts.size == 2) {
-                    append("export ${parts[0]}=${parts[1]}\n")
+                    append("${parts[0]}=${parts[1]}\n")
                 }
             }
             append(AppPrefs.buildDebianX11ImplicitEnvSnippet())
@@ -136,7 +136,7 @@ object DisplayOrchestrator {
             graphicsEnv.lines().filter { it.isNotBlank() }.forEach { line ->
                 val parts = line.split("=", limit = 2)
                 if (parts.size == 2) {
-                    append("export ${parts[0]}=${parts[1]}\n")
+                    append("${parts[0]}=${parts[1]}\n")
                 }
             }
             append(AppPrefs.buildDebianX11ImplicitEnvSnippet())
@@ -182,7 +182,7 @@ object DisplayOrchestrator {
             graphicsEnv.lines().filter { it.isNotBlank() }.forEach { line ->
                 val parts = line.split("=", limit = 2)
                 if (parts.size == 2) {
-                    append("export ${parts[0]}=${parts[1]}\n")
+                    append("${parts[0]}=${parts[1]}\n")
                 }
             }
             append(AppPrefs.buildDebianX11ImplicitEnvSnippet())
@@ -219,6 +219,7 @@ object DisplayOrchestrator {
         b.append("WAYLAND_DISPLAY=").append(socketName).append("\n")
         when (openGLMode) {
             "VIRGL" -> {
+                b.append("unset VK_ICD_FILENAMES MESA_VK_WSI_PRESENT_MODE MESA_LOADER_DRIVER_OVERRIDE VKD3D_FEATURE_LEVEL VK_DRIVER_FILES VN_DEBUG || true\n")
                 b.append("GALLIUM_DRIVER=virpipe\n")
                 b.append("MESA_LOADER_DRIVER_OVERRIDE=virpipe\n")
                 b.append("LIBGL_ALWAYS_SOFTWARE=0\n")
@@ -282,6 +283,7 @@ object DisplayOrchestrator {
         sb.append("export DISPLAY=:0\n")
         when (openGL) {
             "VIRGL" -> {
+                sb.append("unset VK_ICD_FILENAMES MESA_VK_WSI_PRESENT_MODE MESA_LOADER_DRIVER_OVERRIDE VKD3D_FEATURE_LEVEL VK_DRIVER_FILES VN_DEBUG || true\n")
                 sb.append("export GALLIUM_DRIVER=virpipe\n")
                 sb.append("export MESA_LOADER_DRIVER_OVERRIDE=virpipe\n")
                 sb.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
@@ -289,6 +291,8 @@ object DisplayOrchestrator {
                 sb.append("export VTEST_RENDERER_SOCKET_NAME=/run/xodos2-virgl/vtest.sock\n")
             }
             "ZINK" -> {
+                sb.append("export VKD3D_FEATURE_LEVEL=12_0\n")
+                sb.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")               
                 sb.append("export GALLIUM_DRIVER=zink\n")
                 sb.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")
                 sb.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
@@ -300,7 +304,7 @@ object DisplayOrchestrator {
                 sb.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/gl4es:\$LD_LIBRARY_PATH\n")
             }
             else -> {
-               sb.append("unset VK_ICD_FILENAMES MESA_VK_WSI_PRESENT_MODE MESA_LOADER_DRIVER_OVERRIDE VKD3D_FEATURE_LEVEL VK_DRIVER_FILES VN_DEBUG || true\n")
+                sb.append("unset VK_ICD_FILENAMES MESA_VK_WSI_PRESENT_MODE MESA_LOADER_DRIVER_OVERRIDE VKD3D_FEATURE_LEVEL VK_DRIVER_FILES VN_DEBUG || true\n")
                 sb.append("export GALLIUM_DRIVER=llvmpipe\n")
                 sb.append("export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe\n")
                 sb.append("export LIBGL_ALWAYS_SOFTWARE=1\n")
