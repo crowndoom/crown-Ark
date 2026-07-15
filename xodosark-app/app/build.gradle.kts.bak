@@ -30,14 +30,14 @@ kotlinOptions {
         defaultConfig {
         applicationId = "app.xodos2"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 28
       
         ndkVersion = "27.1.12297006"   
         buildConfigField("String", "COMMIT", "\"xodos2-embedded-x11\"")
         // versionName: user-visible, align with git tag / Release (e.g. v0.1.0 → "0.1.0").
         // versionCode: positive integer, must increase for every new APK you ship (Play / sideload).
         versionCode = 6
-        versionName = "0.6.0"
+        versionName = "0.6.1"
     }
 
     signingConfigs {

@@ -1170,16 +1170,19 @@ LaunchedEffect(terminalSessionState.activeSessionId) {
 // Bootstrap extraction effect
 LaunchedEffect(bootstrapUri) {
     val uri = bootstrapUri ?: return@LaunchedEffect
-    bootstrapUri = null   // consume
+    // Prevent starting a new extraction if one is already running
+    if (bootstrapInProgress) return@LaunchedEffect
+
     bootstrapInProgress = true
     bootstrapProgress = 0 to "Copying archive…"
 
-    val usrDir = File(context.filesDir, "usr").apply { mkdirs() }
+    val dataDir = context.filesDir          // /data/data/app.xodos2/files
+    val usrDir = File(dataDir, "usr")       // /data/data/app.xodos2/files/usr
     val cacheDir = context.cacheDir
     val tempArchive = File(cacheDir, "bootstrap_${System.currentTimeMillis()}.tar.xz")
 
     try {
-        // Copy selected file to cache
+        // 1. Copy selected file to cache
         withContext(Dispatchers.IO) {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 tempArchive.outputStream().use { output ->
@@ -1188,60 +1191,92 @@ LaunchedEffect(bootstrapUri) {
             }
         }
 
-        // Run pv + tar with correct environment
-        val usrBin = File(usrDir, "bin").absolutePath
-        val usrLib = File(usrDir, "lib").absolutePath
+        // 2. Total uncompressed size for pv (209 MB – adjust if needed)
+        val totalSize = 209L * 1024 * 1024
+
+        // 3. Binary paths
+        val xzBinary  = File(usrDir, "bin/xz").absolutePath
+        val pvBinary  = File(usrDir, "bin/pv").absolutePath
+        val tarBinary = File(usrDir, "bin/tar").absolutePath
+        val libDir    = File(usrDir, "lib").absolutePath
+
+        // Check that all binaries exist
+        for (path in listOf(xzBinary, pvBinary, tarBinary)) {
+            if (!File(path).exists()) throw Exception("Missing binary: $path")
+            File(path).setExecutable(true)
+        }
+
         val env = mapOf(
-            "PATH" to "$usrBin:/system/bin:/sbin:/bin",
-            "LD_LIBRARY_PATH" to "$usrLib:/system/lib64:/lib",
-            "TMPDIR" to cacheDir.absolutePath
+            "PATH"            to "${File(usrDir, "bin").absolutePath}:/system/bin:/sbin:/bin",
+            "LD_LIBRARY_PATH" to "$libDir:/system/lib64:/lib",
+            "TMPDIR"          to cacheDir.absolutePath
         )
 
-        val cmd = arrayOf(
-            "/system/bin/sh", "-c",
-            "pv -f ${tempArchive.absolutePath} | tar -xJ -C ${usrDir.absolutePath}"
-        )
+        // Command: xz -dc archive | pv -n -s totalsize | tar -xf - -C dataDir
+        // Remove conflicting directory before extraction
+val shellCmd = "rm -rf ${dataDir.absolutePath}/usr/share/X11/xkb && " +
+               "$xzBinary -dc ${tempArchive.absolutePath} | " +
+               "$pvBinary -n -s $totalSize | " +
+               "$tarBinary -xf - -C ${dataDir.absolutePath}"
+        Log.d("BootstrapExtract", "Running: $shellCmd")
 
-        val process = ProcessBuilder(*cmd)
-            .directory(cacheDir)
-            .apply { environment().putAll(env) }
-            .redirectErrorStream(false) // pv prints progress to stderr
-            .start()
+        val cmd = arrayOf("/system/bin/sh", "-c", shellCmd)
 
-        // Parse pv's stderr for percentage
-        val errReader = process.errorStream.bufferedReader()
-        val percentRegex = Regex("""(\d+)%""")
-        scope.launch(Dispatchers.IO) {
-            errReader.forEachLine { line ->
-                percentRegex.find(line)?.let { match ->
-                    val pct = match.groupValues[1].toInt()
-                    withContext(Dispatchers.Main) {
-                        bootstrapProgress = pct to "Extracting… $pct%"
+        // 4. Run extraction and read progress
+        withContext(Dispatchers.IO) {
+            val process = ProcessBuilder(*cmd)
+                .directory(cacheDir)
+                .apply { environment().putAll(env) }
+                .redirectErrorStream(false)   // pv writes numeric progress to stderr
+                .start()
+
+            // Read stderr (pv progress) and collect error output
+            val stderrLines = mutableListOf<String>()
+            val progressJob = launch {
+                process.errorStream.bufferedReader().use { reader ->
+                    var line = reader.readLine()
+                    while (line != null) {
+                        stderrLines.add(line)
+                        val percent = line.toIntOrNull()
+                        if (percent != null && percent in 0..100) {
+                            withContext(Dispatchers.Main) {
+                                bootstrapProgress = percent to "Extracting… $percent%"
+                            }
+                        }
+                        line = reader.readLine()
                     }
                 }
             }
-        }
 
-        val exitCode = process.waitFor()
-        tempArchive.delete()
+            val exitCode = process.waitFor()
+            progressJob.join()   // wait for all progress lines to be processed
+            tempArchive.delete()
 
-        withContext(Dispatchers.Main) {
-            if (exitCode == 0) {
-                bootstrapProgress = 100 to "Extra drivers installed"
-                Toast.makeText(context, "Extra drivers packages installed", Toast.LENGTH_SHORT).show()
-            } else {
-                bootstrapError = "Extraction failed (exit code $exitCode)"
-                Toast.makeText(context, "Extra drivers extraction failed", Toast.LENGTH_LONG).show()
+            val stderrLog = stderrLines.joinToString("\n")
+            Log.d("BootstrapExtract", "Exit code: $exitCode, stderr:\n$stderrLog")
+
+            withContext(Dispatchers.Main) {
+                if (exitCode == 0) {
+                    bootstrapProgress = 100 to "Extra drivers installed"
+                    Toast.makeText(context, "Extra drivers packages installed", Toast.LENGTH_SHORT).show()
+                } else {
+                    val errMsg = if (stderrLog.isNotEmpty()) stderrLog else "unknown error"
+                    bootstrapError = "Extraction failed (exit $exitCode): $errMsg"
+                    Toast.makeText(context, "Extra drivers extraction failed", Toast.LENGTH_LONG).show()
+                }
             }
         }
     } catch (e: Exception) {
+        Log.e("BootstrapExtract", "Extraction error", e)
         withContext(Dispatchers.Main) {
             bootstrapError = "Error: ${e.message}"
             Toast.makeText(context, "Extra drivers installation error", Toast.LENGTH_LONG).show()
         }
     } finally {
+        // Clear the URI only after everything finishes – prevents early cancellation
         withContext(Dispatchers.Main) {
             bootstrapInProgress = false
+            bootstrapUri = null
         }
     }
 }
