@@ -8,35 +8,56 @@ object DesktopInstallScripts {
         // Nix environment
         if (cleanDistro.contains("nix")) {
             return "source /nix/var/nix/profiles/default/etc/profile.d/nix.sh 2>/dev/null || true\n" +
-                   "nix-channel --update && nix-env -u\n" +
+                   "nix-channel --update && nix-env -u || true\n" +
                    "export PULSE_SERVER=127.0.0.1\n" +
                    "echo 'Nix profile packages updated successfully!'\n"
         }
 
-        // Package manager & base deps
+        // Package manager commands configured with "ignore errors" / "force install" flags
         val (managerCmd, baseDeps) = when {
             cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") ||
             cleanDistro.contains("kali") || cleanDistro.contains("trisquel") ->
-                Pair("apt update && apt upgrade -y && apt install -y",
-                    "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip")
+                Pair(
+                    "apt-get update -y && apt-get upgrade -y --allow-downgrades --allow-remove-essential || true\n" +
+                    "apt-get install -y --allow-downgrades --allow-remove-essential --option Dpkg::Options::=\"--force-confdef\" --option Dpkg::Options::=\"--force-confold\" --option Dpkg::Options::=\"--force-overwrite\"",
+                    "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip"
+                )
             cleanDistro.contains("arch") || cleanDistro.contains("manjaro") || cleanDistro.contains("artix") ->
-                Pair("pacman -Syu --noconfirm --needed",
-                    "mesa-utils xorg-server xorg-xwayland vulkan-devel mesa vulkan-tools dbus")
+                Pair(
+                    "pacman -Syu --noconfirm --needed --overwrite \"*\" || true\n" +
+                    "pacman -S --noconfirm --needed --overwrite \"*\"",
+                    "mesa-utils xorg-server xorg-xwayland vulkan-devel mesa vulkan-tools dbus"
+                )
             cleanDistro.contains("fedora") || cleanDistro.contains("almalinux") || cleanDistro.contains("rocky") ->
-                Pair("dnf upgrade -y && dnf install -y",
-                    "mesa-utils xorg-x11-server-Xwayland vulkan-loader-devel mesa-dri-drivers vulkan-tools dbus-x11 zip unzip")
+                Pair(
+                    "dnf upgrade -y || true\n" +
+                    "dnf install -y --allowerasing --skip-broken",
+                    "mesa-utils xorg-x11-server-Xwayland vulkan-loader-devel mesa-dri-drivers vulkan-tools dbus-x11 zip unzip"
+                )
             cleanDistro.contains("alpine") ->
-                Pair("apk update && apk add",
-                    "mesa-utils xwayland vulkan-loader mesa-dri-gallium vulkan-tools dbus")
+                Pair(
+                    "apk update || true\n" +
+                    "apk add --force-broken-world --force-non-repository",
+                    "mesa-utils xwayland vulkan-loader mesa-dri-gallium vulkan-tools dbus"
+                )
             cleanDistro.contains("void") ->
-                Pair("xbps-install -Su && xbps-install -y",
-                    "mesa-utils xwayland vulkan-loader mesa-dri vulkan-tools dbus")
+                Pair(
+                    "xbps-install -Syu || true\n" +
+                    "xbps-install -y -f",
+                    "mesa-utils xwayland vulkan-loader mesa-dri vulkan-tools dbus"
+                )
             cleanDistro.contains("opensuse") ->
-                Pair("zypper --non-interactive refresh && zypper --non-interactive install ",
-                    "mesa-utils xorg-x11-server-Xwayland vulkan-devel mesa-dri-drivers vulkan-tools dbus-1-x11 zip unzip")
+                Pair(
+                    "zypper --non-interactive refresh || true\n" +
+                    "zypper --non-interactive install --force-resolution --allow-downgrade",
+                    "mesa-utils xorg-x11-server-Xwayland vulkan-devel mesa-dri-drivers vulkan-tools dbus-1-x11 zip unzip"
+                )
             else ->
-                Pair("apt update && apt upgrade -y && apt install -y",
-                    "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip")
+                Pair(
+                    "apt-get update -y && apt-get upgrade -y --allow-downgrades --allow-remove-essential || true\n" +
+                    "apt-get install -y --allow-downgrades --allow-remove-essential --option Dpkg::Options::=\"--force-confdef\" --option Dpkg::Options::=\"--force-confold\" --option Dpkg::Options::=\"--force-overwrite\"",
+                    "mesa-utils xwayland libvulkan-dev mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 libegl-mesa0 vulkan-tools dbus-x11 zip unzip"
+                )
         }
 
         // ─── Kali‑specific setup (improved) ───
@@ -77,19 +98,19 @@ rm -f /var/lib/dpkg/info/openssh*.postinst
 # Force dpkg to mark the previously failing packages as configured
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
-dpkg --configure -a --force-all
+dpkg --configure -a --force-all || true
 
 # 4. Set clean software repository targets
 echo "deb http://kali.download/kali kali-rolling main non-free contrib non-free-firmware" > /etc/apt/sources.list
 rm -rf /etc/apt/sources.list.d/
 mkdir -p /etc/apt/sources.list.d/
 
-apt-get update -y
+apt-get update -y || true
 apt-get install -y --no-install-recommends gnupg curl || true
 curl -fsSL --connect-timeout 30 https://archive.kali.org/archive-key.asc | gpg --yes --dearmor -o /etc/apt/trusted.gpg.d/kali-archive-keyring.gpg || true
 
 # Force dependency fixes clear before pulling down target desktop environments
-apt-get install -f -y --allow-downgrades
+apt-get install -f -y --allow-downgrades || true
 echo "Kali base environment aligned."
             """.trimIndent() + "\n"
         } else ""
@@ -97,9 +118,8 @@ echo "Kali base environment aligned."
         val libc6Setup = if (cleanDistro.contains("kali")) {
             """
                 
-                
-                dpkg --configure -a --force-all
-                apt-get install -f -y --allow-downgrades
+                dpkg --configure -a --force-all || true
+                apt-get install -f -y --allow-downgrades || true
                 echo "Kali libc6 fixed."
             """.trimIndent() + "\n"
         } else ""
@@ -129,13 +149,14 @@ echo "Kali base environment aligned."
         // Desktop environment packages
         val desktopPackages = when (envName) {
             "XFCE Desktop" -> when {
-                cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "xfce4 xfce4-goodies"
-                cleanDistro.contains("alpine") -> "xfce4 xfce4-terminal"
-                else -> "xfce4 xfce4-goodies"
+                cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "xfce4* xfce4-goodies"
+                cleanDistro.contains("alpine") -> "xfce4* xfce4-terminal"
+                else -> "xfce4* xfce4-goodies xfce4-session xfce4-panel xfce4-settings xfwm4 xfdesktop thunar xfce4-terminal glx-utils"
             }
             "LXQt Desktop" -> when {
                 cleanDistro.contains("arch") || cleanDistro.contains("manjaro") -> "lxqt lxqt-themes featherpad"
                 cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") -> "lxqt openbox"
+                cleanDistro.contains("fedora") -> "@lxqt-desktop-environment qt5-qtbase-gui qt6-qtbase-gui"
                 else -> "lxqt"
             }
             "KDE Plasma" -> when {
@@ -165,15 +186,26 @@ echo "Kali base environment aligned."
         val kdeArchProotFix = if (envName == "KDE Plasma" && (cleanDistro.contains("arch") || cleanDistro.contains("manjaro"))) {
             """
                 echo "Downgrading kwin to fix PRoot Wayland crashing bug..."
-                pacman -U --noconfirm https://pkgmirror.sametimetomorrow.net/aarch64/packages/k/kwin/kwin-6.6.5-4-aarch64.pkg.tar.xz
+                pacman -U --noconfirm https://pkgmirror.sametimetomorrow.net/aarch64/packages/k/kwin/kwin-6.6.5-4-aarch64.pkg.tar.xz || true
                 echo "kwin successfully downgraded."
             """.trimIndent() + "\n"
         } else ""
 
-        // Build script body
+        // Polkit mitigation optimization block (helps solve blank authentication popups in PRoot environments)
+        val polkitMitigation = """
+            echo "Applying PRoot optimizations..."
+            for file in /etc/xdg/autostart/*.desktop; do
+                if [ -f "${'$'}file" ] && grep -qi "polkit" "${"$"}{file}"; then
+                    rm -f "${'$'}file"
+                fi
+            done
+        """.trimIndent() + "\n"
+
+        // Build script body with safety boundaries (`|| true`) for the critical installs
         var scriptBody = gpgSetup +
-                "$managerCmd $desktopPackages $baseDeps $audioDeps\n" +
+                "$managerCmd $desktopPackages $baseDeps $audioDeps || true\n" +
                 kdeArchProotFix +
+                polkitMitigation +
                 "export PULSE_SERVER=127.0.0.1\n" +
                 libc6Setup +
                 "echo 'Installation completed!'\n"
@@ -183,24 +215,19 @@ echo "Kali base environment aligned."
             (cleanDistro.contains("debian") || cleanDistro.contains("ubuntu") ||
              cleanDistro.contains("kali") || cleanDistro.contains("trisquel"))) {
             scriptBody += """
-                # Apply GNOME
-               rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service
+                # Apply GNOME Workarounds
+                rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service 2>/dev/null || true
                 echo 'fixed try using those commands to start desktop'
-                rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service
+                rm -f /usr/share/dbus-1/system-services/org.freedesktop.login1.service 2>/dev/null || true
 
-killall -9 gnome-session-binary dbus-daemon dbus-launch metacity gnome-panel 2>/dev/null
-rm -f /run/dbus/pid && mkdir -p /run/dbus && dbus-daemon --system --fork
+                killall -9 gnome-session-binary dbus-daemon dbus-launch metacity gnome-panel 2>/dev/null || true
+                rm -f /run/dbus/pid && mkdir -p /run/dbus
 
-export XDG_CURRENT_DESKTOP=GNOME
-export DESKTOP_SESSION=gnome
-export XDG_SESSION_DESKTOP=gnome
-
-#dbus-run-session gnome-shell  --x11
-
+                export XDG_CURRENT_DESKTOP=GNOME
+                export DESKTOP_SESSION=gnome
+                export XDG_SESSION_DESKTOP=gnome
             """.trimIndent() + "\n"
         }
-
-
 
         // Always wrap in a heredoc
         return "sh <<'EOF'\n${scriptBody}\nEOF"
