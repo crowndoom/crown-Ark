@@ -81,28 +81,20 @@ object NativeInstallCoordinator {
         // Custom URLs are dynamic, so we bypass the static cache for them
         if (source == DistroSource.CUSTOM) {
             return withContext(Dispatchers.IO) {
-                // Fallback to Alpine if no custom URLs are provided
-               val urlsToFetch = customUrls.ifEmpty {
-    listOf(
-        // Others 
-        "https://github.com/xodiosx/XoDos-Ark/releases/download/v2.34.7/nixos-aarch64-pd-v2.34.7.tar.xz",
-      
-        // All aarch64 distros from XoDos-Ark mirror-v4.17.3
-        "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/alpine-aarch64-pd-v4.17.3.tar.xz",
-        "https://github.com/termux/proot-distro/releases/download/v4.18.0/ubuntu-noble-aarch64-pd-v4.18.0.tar.xz",
-        "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/chimera-aarch64-pd-v4.17.3.tar.xz",
-        "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/debian-bookworm-aarch64-pd-v4.17.3.tar.xz",
-        "https://easycli.sh/proot-distro/v5.0.0/fedora_43-1.6_aarch64_rootfs.tar.xz",
-        "https://easycli.sh/proot-distro/v5.0.0/archlinuxarm_2026.04.03_aarch64_rootfs.tar.xz",
-        "https://easycli.sh/proot-distro/v5.0.0/debian_trixie_aarch64_rootfs.tar.xz"
-    )
-}
+                val urlsToFetch = customUrls.ifEmpty {
+                    listOf(
+                        "https://github.com/xodiosx/XoDos-Ark/releases/download/v2.34.7/nixos-aarch64-pd-v2.34.7.tar.xz",
+                        "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/chimera-aarch64-pd-v4.17.3.tar.xz",
+                        "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/debian-bookworm-aarch64-pd-v4.17.3.tar.xz"
+                    )
+                }
 
                 urlsToFetch.map { url ->
                     async {
                         val archiveName = url.substringAfterLast('/')
                         val distroType = guessDistroType(archiveName)
-                        val distroName = archiveName.split(Regex("[-_.]")).firstOrNull()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() } ?: "Custom"
+                        val rawName = archiveName.split(Regex("[-_.]")).firstOrNull()?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() } ?: "Custom"
+                        val distroName = if (rawName.equals("debian", ignoreCase = true)) "Debian Bookworm" else rawName
                         val version = extractVersion(archiveName)
                         val realSize = getFileSizeFromUrl(url)
 
@@ -131,8 +123,8 @@ object NativeInstallCoordinator {
                     // =======================================================
                     val kaliUrl = "https://kali.download/nethunter-images/current/rootfs/"
                     try {
-                        withTimeout(15_000L) {
-                            val doc = org.jsoup.Jsoup.connect(kaliUrl).timeout(10_000).get()
+                        withTimeout(12_000L) {
+                            val doc = org.jsoup.Jsoup.connect(kaliUrl).timeout(8000).get()
                             val links = doc.select("a[href]")
 
                             coroutineScope {
@@ -162,7 +154,33 @@ object NativeInstallCoordinator {
                             }
                         }
                     } catch (e: Exception) {
-                        Log.e("NativeInstall", "Failed to fetch Kali distros", e)
+                        Log.e("NativeInstall", "Failed to fetch Kali distros, using fallbacks", e)
+                    }
+
+                    // If scraper failed or returned empty, populate with high-quality working fallbacks
+                    if (all.isEmpty()) {
+                        all.add(
+                            DistroDescriptor(
+                                distroName = "Kali Nethunter (Full)",
+                                distroType = "kali",
+                                archiveName = "kalifs-arm64-full.tar.xz",
+                                downloadUrl = "https://kali.download/nethunter-images/current/rootfs/kalifs-arm64-full.tar.xz",
+                                version = "Current",
+                                size = "1.8 GB",
+                                extractDirName = ""
+                            )
+                        )
+                        all.add(
+                            DistroDescriptor(
+                                distroName = "Kali Nethunter (Minimal)",
+                                distroType = "kali",
+                                archiveName = "kalifs-arm64-minimal.tar.xz",
+                                downloadUrl = "https://kali.download/nethunter-images/current/rootfs/kalifs-arm64-minimal.tar.xz",
+                                version = "Current",
+                                size = "230 MB",
+                                extractDirName = ""
+                            )
+                        )
                     }
                 }
 
@@ -172,8 +190,8 @@ object NativeInstallCoordinator {
                     // =======================================================
                     val easyCliUrl = "https://easycli.sh/proot-distro/"
                     try {
-                        withTimeout(15_000L) {
-                            val doc = org.jsoup.Jsoup.connect(easyCliUrl).timeout(10_000).get()
+                        withTimeout(12_000L) {
+                            val doc = org.jsoup.Jsoup.connect(easyCliUrl).timeout(8000).get()
                             val links = doc.select("a[href]")
 
                             coroutineScope {
@@ -205,7 +223,60 @@ object NativeInstallCoordinator {
                             }
                         }
                     } catch (e: Exception) {
-                        Log.e("NativeInstall", "Failed to fetch EasyCLI distros", e)
+                        Log.e("NativeInstall", "Failed to fetch EasyCLI distros, using fallbacks", e)
+                    }
+
+                    // Fallback list of guaranteed working official & up-to-date distros
+                    if (all.isEmpty()) {
+                        all.addAll(
+                            listOf(
+                                DistroDescriptor(
+                                    distroName = "Debian Trixie (Testing)",
+                                    distroType = "debian",
+                                    archiveName = "debian_trixie_aarch64_rootfs.tar.xz",
+                                    downloadUrl = "https://easycli.sh/proot-distro/v5.0.0/debian_trixie_aarch64_rootfs.tar.xz",
+                                    version = "Trixie",
+                                    size = "118 MB",
+                                    extractDirName = ""
+                                ),
+                                DistroDescriptor(
+                                    distroName = "Ubuntu Noble",
+                                    distroType = "ubuntu",
+                                    archiveName = "ubuntu-noble-aarch64-pd-v4.18.0.tar.xz",
+                                    downloadUrl = "https://github.com/termux/proot-distro/releases/download/v4.18.0/ubuntu-noble-aarch64-pd-v4.18.0.tar.xz",
+                                    version = "24.04",
+                                    size = "92 MB",
+                                    extractDirName = ""
+                                ),
+                                DistroDescriptor(
+                                    distroName = "Arch Linux ARM",
+                                    distroType = "archlinux",
+                                    archiveName = "archlinuxarm_2026.04.03_aarch64_rootfs.tar.xz",
+                                    downloadUrl = "https://easycli.sh/proot-distro/v5.0.0/archlinuxarm_2026.04.03_aarch64_rootfs.tar.xz",
+                                    version = "2026.04.03",
+                                    size = "185 MB",
+                                    extractDirName = ""
+                                ),
+                                DistroDescriptor(
+                                    distroName = "Fedora 43",
+                                    distroType = "fedora",
+                                    archiveName = "fedora_43-1.6_aarch64_rootfs.tar.xz",
+                                    downloadUrl = "https://easycli.sh/proot-distro/v5.0.0/fedora_43-1.6_aarch64_rootfs.tar.xz",
+                                    version = "43",
+                                    size = "98 MB",
+                                    extractDirName = ""
+                                ),
+                                DistroDescriptor(
+                                    distroName = "Alpine Linux",
+                                    distroType = "alpine",
+                                    archiveName = "alpine-aarch64-pd-v4.17.3.tar.xz",
+                                    downloadUrl = "https://github.com/xodiosx/XoDos-Ark/releases/download/mirror-v4.17.3/alpine-aarch64-pd-v4.17.3.tar.xz",
+                                    version = "3.19",
+                                    size = "4.2 MB",
+                                    extractDirName = ""
+                                )
+                            )
+                        )
                     }
                 }
                 else -> {}
