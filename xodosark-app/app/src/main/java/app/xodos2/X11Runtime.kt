@@ -66,7 +66,7 @@ object X11Runtime {
     fun applyLorieProcessEnvForX11ServerProcess(app: Application) {
         val root = app.filesDir
         unpackBundledLorieXkbIfNeeded(app, root)
-        val tmp = File(root, "tmp")
+        val tmp = File(root, "usr/tmp")
         try {
             tmp.mkdirs()
             Os.setenv("TMPDIR", tmp.absolutePath, true)
