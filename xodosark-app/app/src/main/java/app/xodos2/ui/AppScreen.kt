@@ -253,6 +253,7 @@ var confirmOverwriteContinuation by remember { mutableStateOf<CancellableContinu
 
 var showDeleteConfirmation by remember { mutableStateOf<Int?>(null) }   // container id to delete
 var showCleanCacheConfirmation by remember { mutableStateOf(false) }
+var deleteInProgress by remember { mutableStateOf(false) }
 
 var pendingContainerForBackup by remember { mutableStateOf<Int?>(null) }
 var backupInProgress by remember { mutableStateOf(false) }
@@ -1280,6 +1281,25 @@ val shellCmd = "rm -rf ${dataDir.absolutePath}/usr/share/X11/xkb && " +
         }
     }
 }
+if (deleteInProgress) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Deleting container…", style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+    return   // skip the rest of the UI until deletion finishes
+}
+
 
     // ----- graphics helpers -----
 fun checkAndPromptTurnipDrivers() {
@@ -1823,6 +1843,7 @@ if (showDeleteConfirmation != null) {
         },
         confirmButton = {
             TextButton(onClick = {
+            deleteInProgress = true      
                 scope.launch {
                     if (NativeInstallCoordinator.deleteContainerContents(context, containerId)) {
                         refreshContainerState()
@@ -1830,6 +1851,7 @@ if (showDeleteConfirmation != null) {
                     }
                 }
                 showDeleteConfirmation = null
+                deleteInProgress = false  
             }) {
                 Text("Delete", color = MaterialTheme.colorScheme.error)
             }
