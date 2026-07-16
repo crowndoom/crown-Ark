@@ -20,6 +20,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,11 +43,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import app.xodos2.ui.glass.glassBlurModifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import app.xodos2.*
@@ -359,7 +368,7 @@ fun proceedToDistroSelection(containerId: Int) {
         distroFetchState = DistroFetchState.LOADING
         scope.launch {
             availableDistros = withContext(Dispatchers.IO) {
-                NativeInstallCoordinator.fetchAvailableDistros(NativeInstallCoordinator.DistroSource.CUSTOM)
+                NativeInstallCoordinator.fetchAvailableDistros(NativeInstallCoordinator.DistroSource.EASYCLI)
             }
             distroFetchState = if (availableDistros.isEmpty()) DistroFetchState.ERROR else DistroFetchState.LOADED
         }
@@ -1073,7 +1082,7 @@ updateLauncherMarkers(context, launcherDefault)
     
     distroFetchState = DistroFetchState.LOADING
     availableDistros = withContext(Dispatchers.IO) {
-    NativeInstallCoordinator.fetchAvailableDistros(NativeInstallCoordinator.DistroSource.CUSTOM) 
+    NativeInstallCoordinator.fetchAvailableDistros(NativeInstallCoordinator.DistroSource.EASYCLI) 
 }
  
     distroFetchState = if (availableDistros.isEmpty()) {
@@ -1926,8 +1935,8 @@ if (showExitDialog) {
     // ── Distro selection screen ──────────────────────────────────
 // ── Distro selection screen ──────────────────────────────────
 if (showDistroSelection) {
-    // Track which source is currently active. Default to EASYCLI (Normal)
-    var selectedSource by remember { mutableStateOf(NativeInstallCoordinator.DistroSource.CUSTOM) }
+    // Track which source is currently active. Default to EASYCLI (Latest)
+    var selectedSource by remember { mutableStateOf(NativeInstallCoordinator.DistroSource.EASYCLI) }
 
     // Reusable function to trigger the fetch based on the selected source
     val loadDistros = { source: NativeInstallCoordinator.DistroSource ->
@@ -1940,197 +1949,360 @@ if (showDistroSelection) {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFF0E0A1A)
+    ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Top
         ) {
+            Spacer(modifier = Modifier.height(16.dp))
             
-            Text("Select a Linux distribution", style = MaterialTheme.typography.headlineSmall)
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ---- The 3 Buttons Row ----
-            Row(
+            // Premium Linear-style Header Section
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalAlignment = Alignment.Start
             ) {
-                // Button 1: Normal (EasyCLI)
-                val isNormal = selectedSource == NativeInstallCoordinator.DistroSource.EASYCLI
-                val normalModifier = Modifier.weight(1f)
-                if (isNormal) {
-                    Button(onClick = { /* Already selected */ }, modifier = normalModifier) { Text("Latest", maxLines = 1) }
-                } else {
-                    OutlinedButton(onClick = {
-                        selectedSource = NativeInstallCoordinator.DistroSource.EASYCLI
-                        loadDistros(NativeInstallCoordinator.DistroSource.EASYCLI)
-                    }, modifier = normalModifier) { Text("Latest", maxLines = 1) }
-                }
+                Text(
+                    text = "XoDos-Ark",
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    letterSpacing = (-1).sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "SELECT ENVIRONMENT",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF7C3AED),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Choose your workspace template to install into your active container.",
+                    color = Color(0xFF9F92EC),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
 
-                // Button 2: Kali
-                val isKali = selectedSource == NativeInstallCoordinator.DistroSource.KALI
-                val kaliModifier = Modifier.weight(1f)
-                if (isKali) {
-                    Button(onClick = { /* Already selected */ }, modifier = kaliModifier) { Text("Kali", maxLines = 1) }
-                } else {
-                    OutlinedButton(onClick = {
-                        selectedSource = NativeInstallCoordinator.DistroSource.KALI
-                        loadDistros(NativeInstallCoordinator.DistroSource.KALI)
-                    }, modifier = kaliModifier) { Text("Kali", maxLines = 1) }
-                }
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Button 3: Custom
-                val isCustom = selectedSource == NativeInstallCoordinator.DistroSource.CUSTOM
-                val customModifier = Modifier.weight(1f)
-                if (isCustom) {
-                    Button(onClick = { /* Already selected */ }, modifier = customModifier) { Text("Custom", maxLines = 1) }
-                } else {
-                    OutlinedButton(onClick = {
-                        selectedSource = NativeInstallCoordinator.DistroSource.CUSTOM
-                        loadDistros(NativeInstallCoordinator.DistroSource.CUSTOM)
-                    }, modifier = customModifier) { Text("Custom", maxLines = 1) }
+            // ---- Shadcn/ui-style Segmented Control Pills Row ----
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(glassBlurModifier())
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.05f),
+                                Color.White.copy(alpha = 0.01f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.12f),
+                                Color.White.copy(alpha = 0.02f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val tabs = listOf(
+                    "Latest" to NativeInstallCoordinator.DistroSource.EASYCLI,
+                    "Kali" to NativeInstallCoordinator.DistroSource.KALI,
+                    "Custom" to NativeInstallCoordinator.DistroSource.CUSTOM
+                )
+                tabs.forEach { (label, source) ->
+                    val isActive = selectedSource == source
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isActive) Color(0xFF7C3AED) else Color.Transparent)
+                            .clickable {
+                                if (!isActive) {
+                                    selectedSource = source
+                                    loadDistros(source)
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isActive) Color.White else Color(0xFF9F92EC),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ---- Local file picker – ALWAYS visible ----
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(glassBlurModifier())
+                    .clickable {
+                        pickFile.launch(arrayOf("application/x-xz", "*/*"))
+                    },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.04f)
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.12f),
+                            Color.White.copy(alpha = 0.02f)
+                        )
+                    )
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color(0xFF2A1E4A), shape = RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = "Select local file",
+                            modifier = Modifier.size(24.dp),
+                            tint = Color(0xFF7C3AED)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Select Local Distro",
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Install from a local .tar.xz archive",
+                            color = Color(0xFF9F92EC),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
-            // ---- Local file picker – ALWAYS visible ----
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        pickFile.launch(arrayOf("application/x-xz", "*/*"))
-                    }
-                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = "Select local file",
-                    modifier = Modifier.size(36.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Select local distro", fontWeight = FontWeight.Bold)
-                    Text("Install from a local .tar.xz archive", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
+            HorizontalDivider(color = Color(0xFF2A1E4A), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ---- Content depending on fetch state ----
-            when {
-                distroFetchState == DistroFetchState.LOADING -> {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-
-                distroFetchState == DistroFetchState.ERROR && availableDistros.isEmpty() -> {
-                    Column(
-                        modifier = Modifier.weight(1f).fillMaxWidth().padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "No distros found",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            "Check your internet connection and try again.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        TextButton(onClick = {
-                            NativeInstallCoordinator.invalidateDistroCache() 
-                            // Pass the currently selected source to retry properly
-                            loadDistros(selectedSource)
-                        }) {
-                            Text("Retry")
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    distroFetchState == DistroFetchState.LOADING -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF7C3AED))
                         }
                     }
-                }
 
-                else -> {
-                    // Normal list of distros
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(availableDistros) { distro ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        val targetContainer = pendingContainerForInstall
-                                        if (targetContainer != null) {
-                                            pendingContainerForInstall = null
-                                            pendingDistro = distro
-                                            val occupied = when (targetContainer) {
-                                                1 -> hasContainer1
-                                                2 -> hasContainer2
-                                                3 -> hasContainer3
-                                                else -> false
-                                            }
-                                            if (occupied) {
-                                                pendingOverwriteSlot = targetContainer
+                    distroFetchState == DistroFetchState.ERROR && availableDistros.isEmpty() -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color(0xFFEF4444)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Connection offline",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Check your internet connection and try again.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF9F92EC),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = {
+                                NativeInstallCoordinator.invalidateDistroCache() 
+                                loadDistros(selectedSource)
+                            }) {
+                                Text("Retry Connection", color = Color(0xFF7C3AED), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    else -> {
+                        // Normal list of distros
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(availableDistros) { distro ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .then(glassBlurModifier())
+                                        .clickable {
+                                            val targetContainer = pendingContainerForInstall
+                                            if (targetContainer != null) {
+                                                pendingContainerForInstall = null
+                                                pendingDistro = distro
+                                                val occupied = when (targetContainer) {
+                                                    1 -> hasContainer1
+                                                    2 -> hasContainer2
+                                                    3 -> hasContainer3
+                                                    else -> false
+                                                }
+                                                if (occupied) {
+                                                    pendingOverwriteSlot = targetContainer
+                                                } else {
+                                                    installIntoSlot(distro, targetContainer)
+                                                }
                                             } else {
-                                                installIntoSlot(distro, targetContainer)
+                                                pendingDistro = distro
+                                                showSlotPicker = true
                                             }
-                                        } else {
-                                            pendingDistro = distro
-                                            showSlotPicker = true
+                                        },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color.White.copy(alpha = 0.04f)
+                                    ),
+                                    border = BorderStroke(
+                                        width = 1.dp,
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.White.copy(alpha = 0.12f),
+                                                Color.White.copy(alpha = 0.02f)
+                                            )
+                                        )
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // icon
+                                        val resourceName = distro.distroType.lowercase(Locale.ROOT).trim()
+                                        val iconResId = context.resources.getIdentifier(
+                                            resourceName, "drawable", context.packageName
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(48.dp)
+                                                .background(Color(0xFF2A1E4A), shape = RoundedCornerShape(12.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (iconResId != 0) {
+                                                Image(
+                                                    painter = painterResource(iconResId),
+                                                    contentDescription = distro.distroType,
+                                                    modifier = Modifier.size(32.dp)
+                                                )
+                                            } else {
+                                                val fallbackResId = context.resources.getIdentifier(
+                                                    "linux", "drawable", context.packageName
+                                                )
+                                                if (fallbackResId != 0) {
+                                                    Image(
+                                                        painter = painterResource(fallbackResId),
+                                                        contentDescription = "Linux Fallback",
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Folder,
+                                                        contentDescription = "Generic Distro",
+                                                        modifier = Modifier.size(28.dp),
+                                                        tint = Color(0xFF9F92EC)
+                                                    )
+                                                }
+                                            }
                                         }
-                                    }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // icon
-                                val resourceName = distro.distroType.lowercase(Locale.ROOT).trim()
-                                val iconResId = context.resources.getIdentifier(
-                                    resourceName, "drawable", context.packageName
-                                )
-                                if (iconResId != 0) {
-                                    Image(
-                                        painter = painterResource(iconResId),
-                                        contentDescription = distro.distroType,
-                                        modifier = Modifier.size(36.dp)
-                                    )
-                                } else {
-                                    val fallbackResId = context.resources.getIdentifier(
-                                        "linux", "drawable", context.packageName
-                                    )
-                                    if (fallbackResId != 0) {
-                                        Image(
-                                            painter = painterResource(fallbackResId),
-                                            contentDescription = "Linux Fallback",
-                                            modifier = Modifier.size(36.dp)
-                                        )
-                                    } else {
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = distro.distroName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() },
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = distro.archiveName,
+                                                color = Color(0xFF9F92EC),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontSize = 11.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(Color(0xFF2A1E4A), shape = RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "v${distro.version}",
+                                                        color = Color(0xFFC3B6F9),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(Color(0xFF2A1E4A), shape = RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = distro.size,
+                                                        color = Color(0xFFC3B6F9),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Icon(
-                                            imageVector = Icons.Default.Folder,
-                                            contentDescription = "Generic Distro",
-                                            modifier = Modifier.size(36.dp),
-                                            tint = MaterialTheme.colorScheme.outline
+                                            imageVector = Icons.Default.AddCircle,
+                                            contentDescription = "Install distro",
+                                            tint = Color(0xFF7C3AED),
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "${distro.distroName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }} ${distro.version}",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(distro.archiveName, style = MaterialTheme.typography.bodySmall)
-                                    Text(distro.size, style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         }
@@ -2140,14 +2312,35 @@ if (showDistroSelection) {
 
             Spacer(modifier = Modifier.height(16.dp))
             Button(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .then(glassBlurModifier()),
                 onClick = {
                     showDistroSelection = false
                     pendingContainerForInstall = null
                     prefs.edit().putBoolean("setup_done", true).apply()
-                }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White.copy(alpha = 0.05f),
+                    contentColor = Color(0xFFC3B6F9)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.15f),
+                            Color.White.copy(alpha = 0.02f)
+                        )
+                    )
+                )
             ) {
-                Text("Continue without installing")
+                Text(
+                    text = "Continue without installing",
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
     }
