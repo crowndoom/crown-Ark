@@ -1951,45 +1951,61 @@ if (showDistroSelection) {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF0E0A1A)
+        color = Color.Transparent
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Top
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF07040E),
+                            Color(0xFF140D2F)
+                        )
+                    )
+                )
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Premium Linear-style Header Section
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.Start
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Top
             ) {
-                Text(
-                    text = "XoDos-Ark",
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall,
-                    letterSpacing = (-1).sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "SELECT ENVIRONMENT",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF7C3AED),
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Choose your workspace template to install into your active container.",
-                    color = Color(0xFF9F92EC),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Premium Linear-style Header Section
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "XoDos-Ark",
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = 32.sp,
+                            letterSpacing = (-1.2).sp
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "SELECT ENVIRONMENT",
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFFC3B6F9),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 15.sp,
+                            letterSpacing = 1.2.sp
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Choose your workspace template to install into your active container.",
+                        color = Color(0xFF9F92EC),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
             // ---- Shadcn/ui-style Segmented Control Pills Row ----
             Row(
@@ -1999,8 +2015,8 @@ if (showDistroSelection) {
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.05f),
-                                Color.White.copy(alpha = 0.01f)
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.02f)
                             )
                         ),
                         shape = RoundedCornerShape(16.dp)
@@ -2009,8 +2025,8 @@ if (showDistroSelection) {
                         width = 1.dp,
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.12f),
-                                Color.White.copy(alpha = 0.02f)
+                                Color.White.copy(alpha = 0.25f),
+                                Color.White.copy(alpha = 0.04f)
                             )
                         ),
                         shape = RoundedCornerShape(16.dp)
@@ -2030,7 +2046,7 @@ if (showDistroSelection) {
                             .weight(1f)
                             .height(38.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isActive) Color(0xFF7C3AED) else Color.Transparent)
+                            .background(if (isActive) Color(0xCE7C3AED) else Color.Transparent)
                             .clickable {
                                 if (!isActive) {
                                     selectedSource = source
@@ -2061,14 +2077,14 @@ if (showDistroSelection) {
                     },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.04f)
+                    containerColor = Color.White.copy(alpha = 0.05f)
                 ),
                 border = BorderStroke(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.12f),
-                            Color.White.copy(alpha = 0.02f)
+                            Color.White.copy(alpha = 0.22f),
+                            Color.White.copy(alpha = 0.03f)
                         )
                     )
                 )
@@ -2195,14 +2211,14 @@ if (showDistroSelection) {
                                         },
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = Color.White.copy(alpha = 0.04f)
+                                        containerColor = Color.White.copy(alpha = 0.05f)
                                     ),
                                     border = BorderStroke(
                                         width = 1.dp,
                                         brush = Brush.verticalGradient(
                                             colors = listOf(
-                                                Color.White.copy(alpha = 0.12f),
-                                                Color.White.copy(alpha = 0.02f)
+                                                Color.White.copy(alpha = 0.22f),
+                                                Color.White.copy(alpha = 0.03f)
                                             )
                                         )
                                     )
@@ -2252,9 +2268,11 @@ if (showDistroSelection) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = distro.distroName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() },
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.ExtraBold,
                                                 color = Color.White,
-                                                style = MaterialTheme.typography.titleMedium
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontSize = 21.sp
+                                                )
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
@@ -2322,16 +2340,16 @@ if (showDistroSelection) {
                     prefs.edit().putBoolean("setup_done", true).apply()
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.05f),
-                    contentColor = Color(0xFFC3B6F9)
+                    containerColor = Color.White.copy(alpha = 0.09f),
+                    contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.15f),
-                            Color.White.copy(alpha = 0.02f)
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.04f)
                         )
                     )
                 )
@@ -2343,6 +2361,7 @@ if (showDistroSelection) {
                 )
             }
         }
+    }
     }
     return
 }
