@@ -189,6 +189,10 @@ echo "Kali base environment aligned."
                 echo "Downgrading kwin to fix PRoot Wayland crashing bug..."
                 curl -L -o ~/kwin-6.6.5-4-aarch64.pkg.tar.xz https://github.com/xodiosx/XoDos-Ark/releases/download/4.18.1-1fix/kwin-6.6.5-4-aarch64.pkg.tar.xz
                 pacman -U --noconfirm ~/kwin-6.6.5-4-aarch64.pkg.tar.xz
+                balooctl6 status
+                balooctl6 purge
+                balooctl6 suspend
+                balooctl6 disable
                 echo "kwin successfully downgraded."
             """.trimIndent() + "\n"
         } else ""
