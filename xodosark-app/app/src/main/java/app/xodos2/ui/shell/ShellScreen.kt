@@ -306,7 +306,17 @@ fun ShellScreen(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT 
                 )
-                setBackgroundColor(Color.parseColor("#1A1A2E"))
+                val barDrawable = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        Color.parseColor("#E6080512"), // 90% opaque dark violet-slate background
+                        Color.parseColor("#FA030207")  // 98% opaque bottom
+                    )
+                ).apply {
+                    setStroke(1.dpToPx(ctx), Color.parseColor("#22FFFFFF")) // premium subtle thin top-highlight
+                }
+                background = barDrawable
+                setPadding(0, 4.dpToPx(ctx), 0, 4.dpToPx(ctx))
             }
 
             val keysScroll = HorizontalScrollView(ctx).apply {
@@ -450,14 +460,62 @@ private fun rebuildExtraKeys(
     var ctrlButton: TextView? = null
     var altButton: TextView? = null
 
-    val bgColor = Color.parseColor("#1A1A2E")
-    val textColor = Color.parseColor("#BB86FC")
-    val strokeColor = Color.parseColor("#BB86FC")
-    val activeTextColor = Color.parseColor("#FFD700")
+    val textColor = Color.parseColor("#E9D5FF") // elegant light purple-white
+    val activeTextColor = Color.parseColor("#FFD700") // golden yellow for active modifiers
+
+    fun createNormalDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#22FFFFFF"), // 13% white highlight at top for reflection
+            Color.parseColor("#08FFFFFF"), // 3% white at middle
+            Color.parseColor("#15000000"), // 8% black shadow at bottom for depth
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#3BFFFFFF")) // 23% white glassy rim
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createPressedDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#5AFFFFFF"), // 35% white highlight at top
+            Color.parseColor("#1EFFFFFF"), // 12% white at middle
+            Color.parseColor("#00000000"), // transparent at bottom
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#80FFFFFF")) // 50% white border
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createActiveDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#E67C3AED"), // 90% opaque vibrant violet
+            Color.parseColor("#CC4C1D95")  // 80% opaque deep purple
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#FFD700")) // Golden border
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createDefaultStateList(): android.graphics.drawable.StateListDrawable = 
+        android.graphics.drawable.StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), createPressedDrawable())
+            addState(intArrayOf(), createNormalDrawable())
+        }
 
     fun updateButtonColors() {
-        ctrlButton?.setTextColor(if (viewClient.ctrlActive) activeTextColor else textColor)
-        altButton?.setTextColor(if (viewClient.altActive) activeTextColor else textColor)
+        ctrlButton?.let { btn ->
+            btn.setTextColor(if (viewClient.ctrlActive) activeTextColor else textColor)
+            btn.background = if (viewClient.ctrlActive) createActiveDrawable() else createDefaultStateList()
+        }
+        altButton?.let { btn ->
+            btn.setTextColor(if (viewClient.altActive) activeTextColor else textColor)
+            btn.background = if (viewClient.altActive) createActiveDrawable() else createDefaultStateList()
+        }
     }
 
     viewClient.onModifierReset = { terminalView.post { updateButtonColors() } }
@@ -471,12 +529,14 @@ private fun rebuildExtraKeys(
             else            -> baseTextSize * 0.7f
         }
 
-        val drawable = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(bgColor)
-            setStroke(1.dpToPx(context), strokeColor)
-            cornerRadius = 5f * context.resources.displayMetrics.density
+        val drawable = if (label == "CTRL") {
+            if (viewClient.ctrlActive) createActiveDrawable() else createDefaultStateList()
+        } else if (label == "ALT") {
+            if (viewClient.altActive) createActiveDrawable() else createDefaultStateList()
+        } else {
+            createDefaultStateList()
         }
+
         return TextView(context).apply {
             text = label
             setTextColor(textColor)
