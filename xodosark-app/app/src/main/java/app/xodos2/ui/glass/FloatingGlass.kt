@@ -27,7 +27,12 @@ private const val GlassFillApi31 = 0.070f
 private const val GlassHighlightLegacy = 0.144f
 private const val GlassFillLegacy = 0.081f
 
-fun glassBlurModifier(): Modifier = Modifier
+fun glassBlurModifier(): Modifier =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        Modifier.blur(FloatingGlassBlurDp)
+    } else {
+        Modifier
+    }
 
 fun floatingGlassBrush(): Brush =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
