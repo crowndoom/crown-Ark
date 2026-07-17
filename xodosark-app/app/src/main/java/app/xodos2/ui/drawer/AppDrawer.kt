@@ -33,9 +33,18 @@ fun AppDrawer(
     drawerWidth: Dp = 320.dp,
     drawerShape: Shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
     drawerBackgroundColor: Color = Color(0xFA0E0A1A),
+    isBackgroundBlurred: Boolean = false,
     drawerContent: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val animatedSheetBlur by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isBackgroundBlurred) 14.dp else 0.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        ),
+        label = "drawerSheetBlur"
+    )
+
     ModalNavigationDrawer(
         modifier = modifier,
         drawerState = drawerState,
@@ -53,30 +62,33 @@ fun AppDrawer(
                 tonalElevation = 0.dp,
                 shadowElevation = 16.dp,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(glassBlurModifier())
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xC20E0A24), // gorgeous deep translucent violet-slate
-                                    Color(0xDC0B0F1E)  // slightly denser deep black-slate
-                                )
-                            ),
-                            shape = drawerShape
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.18f),
-                                    Color.White.copy(alpha = 0.04f)
-                                )
-                            ),
-                            shape = drawerShape
-                        )
-                ) {
+                val baseSheetModifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xC20E0A24), // gorgeous deep translucent violet-slate
+                                Color(0xDC0B0F1E)  // slightly denser deep black-slate
+                            )
+                        ),
+                        shape = drawerShape
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.18f),
+                                Color.White.copy(alpha = 0.04f)
+                            )
+                        ),
+                        shape = drawerShape
+                    )
+                val sheetModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && animatedSheetBlur > 0.dp) {
+                    baseSheetModifier.blur(animatedSheetBlur)
+                } else {
+                    baseSheetModifier
+                }
+                Box(modifier = sheetModifier) {
                     drawerContent()
                 }
             }
@@ -84,7 +96,7 @@ fun AppDrawer(
     ) {
         val isOpeningOrOpen = drawerState.targetValue == DrawerValue.Open
         val animatedBlur by androidx.compose.animation.core.animateDpAsState(
-            targetValue = if (isOpeningOrOpen) 14.dp else 0.dp,
+            targetValue = if (isOpeningOrOpen || isBackgroundBlurred) 14.dp else 0.dp,
             animationSpec = androidx.compose.animation.core.spring(
                 stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
             ),
