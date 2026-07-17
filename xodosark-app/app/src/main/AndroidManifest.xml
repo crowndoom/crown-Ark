@@ -173,6 +173,16 @@ android:name="android.content.action.DOCUMENTS_PROVIDER"/>
             android:enabled="true"
             
             android:exported="false"/>
+            
+       <!-- ================= Crash report ================= -->
+            
+
+<activity 
+    android:name=".ui.CrashActivity" 
+    android:exported="false" 
+    android:process=":crash" 
+    android:theme="@style/AppTheme" />
+
 
         <!-- ================= KEY INTERCEPTOR ================= -->
 

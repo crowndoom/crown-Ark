@@ -1,21 +1,29 @@
 package app.xodos2.ui.drawer.menu
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun DrawerMenu(
@@ -31,14 +39,57 @@ fun DrawerMenu(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(vertical = 12.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-            )
+            // Container/OS Header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.08f),
+                                Color.White.copy(alpha = 0.02f)
+                            )
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.25f),
+                                Color.White.copy(alpha = 0.04f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            letterSpacing = (-0.5).sp
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
 
             DrawerExpandableSection(title = "Display", defaultExpanded = true) {
                 DrawerPrimaryItem(
@@ -61,7 +112,7 @@ fun DrawerMenu(
                 )
 
                 DrawerDropdownField(
-                    label = "default Display",
+                    label = "Default Display",
                     value = labels.launcherDefaultLabel,
                     options = options.launcherDefaultOptions,
                     onSelect = {
@@ -71,7 +122,7 @@ fun DrawerMenu(
                 )
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
             DrawerExpandableSection(title = "Desktop", defaultExpanded = true) {
                 DrawerDropdownField(
@@ -96,7 +147,7 @@ fun DrawerMenu(
 
                 DrawerExpandableSection(title = "View", defaultExpanded = true) {
                     DrawerDropdownField(
-                        label = "Mouse mode",
+                        label = "Mouse Mode",
                         value = labels.mouseModeLabel,
                         options = options.mouseModeOptions,
                         onSelect = {
@@ -123,14 +174,15 @@ fun DrawerMenu(
                         },
                     )
                 }
+                
                 DrawerTextItem(title = "Open Keyboard", onClick = actions.onKeyboardClick)
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
             DrawerExpandableSection(title = "Terminal", defaultExpanded = true) {
                 DrawerDropdownField(
-                    label = "Terminal font",
+                    label = "Terminal Font",
                     value = labels.terminalFontLabel,
                     options = options.terminalFontOptions,
                     onSelect = {
@@ -151,7 +203,7 @@ fun DrawerMenu(
             }
 
             if (extraContent != null) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 extraContent()
             }
         }
@@ -162,44 +214,128 @@ fun DrawerMenu(
 private fun DrawerPrimaryItem(
     title: String,
     onTap: () -> Unit,
-    onLongPress: (() -> Unit)?,
+    onLongPress: (() -> Unit)? = null,
 ) {
-    val mod = Modifier
-        .fillMaxWidth()
-        .pointerInput(title) {
-            detectTapGestures(
-                onTap = { onTap() },
-                onLongPress = { onLongPress?.invoke() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.06f),
+                        Color.White.copy(alpha = 0.01f)
+                    )
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.20f),
+                        Color.White.copy(alpha = 0.02f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .pointerInput(title) {
+                detectTapGestures(
+                    onTap = { onTap() },
+                    onLongPress = { onLongPress?.invoke() }
+                )
+            }
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondary,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = "Launch",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(20.dp)
             )
         }
-        .padding(vertical = 12.dp, horizontal = 12.dp)
-    Text(
-        text = title,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = mod
-    )
+    }
 }
-
-@Composable
-private fun DrawerPrimaryItem(
-    title: String,
-    onTap: () -> Unit,
-) = DrawerPrimaryItem(title = title, onTap = onTap, onLongPress = null)
 
 @Composable
 private fun DrawerTextItem(
     title: String,
     onClick: () -> Unit,
 ) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.primary,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.06f),
+                        Color.White.copy(alpha = 0.01f)
+                    )
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.20f),
+                        Color.White.copy(alpha = 0.02f)
+                    )
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 12.dp)
-    )
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Rounded.Build,
+                contentDescription = "Action",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
 }
-

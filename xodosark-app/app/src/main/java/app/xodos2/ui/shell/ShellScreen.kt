@@ -55,6 +55,7 @@ import app.xodos2.shell.ShellViewClient
 import app.xodos2.wayland.input.InputRouteState
 import com.termux.view.TerminalView
 import org.json.JSONArray
+import org.json.JSONObject
 
 private val DEFAULT_EXTRA_KEYS_JSON = """
 [
@@ -62,6 +63,12 @@ private val DEFAULT_EXTRA_KEYS_JSON = """
   ["TAB", "CTRL", "ALT", "LEFT", "DOWN", "RIGHT", "PGDN"]
 ]
 """.trimIndent()
+
+private data class ExtraKeyItem(
+    val key: String = "",
+    val macro: String = "",
+    val display: String = ""
+)
 
 private class ViewCache(
     val controller: ShellSessionController,
@@ -93,8 +100,9 @@ fun ShellScreen(
     }
 
     val sharedPrefs = remember {
-        context.getSharedPreferences("xodos2_terminal_prefs", Context.MODE_PRIVATE)
-    }
+    context.getSharedPreferences("xodos2_terminal_prefs", Context.MODE_PRIVATE)
+}
+
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var showCloseSessionDialog by remember { mutableStateOf(false) }
@@ -149,7 +157,7 @@ fun ShellScreen(
                             .height(180.dp)
                     )
                     Text(
-                        text = "Supported keys: CTRL, ALT, ESC, TAB, HOME, END, PGUP, PGDN, UP, DOWN, LEFT, RIGHT, COPY, PASTE, or any single character (e.g., '-', '/').\n\nMust be a valid 2D JSON Array.",
+                        text = "Supports Termux format objects: {\"key\": \"ESC\", \"display\": \"␛\"} or {\"macro\": \"history\\n\", \"display\": \"H\"} as well as single character/key strings.\n\nMust be a valid 2D JSON Array.",
                         style = MaterialTheme.typography.bodySmall,
                         color = androidx.compose.ui.graphics.Color.Gray,
                         modifier = Modifier.padding(top = 8.dp)
@@ -306,7 +314,17 @@ fun ShellScreen(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT 
                 )
-                setBackgroundColor(Color.parseColor("#1A1A2E"))
+                val barDrawable = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        Color.parseColor("#E6080512"), // 90% opaque dark violet-slate background
+                        Color.parseColor("#FA030207")  // 98% opaque bottom
+                    )
+                ).apply {
+                    setStroke(1.dpToPx(ctx), Color.parseColor("#22FFFFFF")) // premium subtle thin top-highlight
+                }
+                background = barDrawable
+                setPadding(0, 4.dpToPx(ctx), 0, 4.dpToPx(ctx))
             }
 
             val keysScroll = HorizontalScrollView(ctx).apply {
@@ -450,14 +468,62 @@ private fun rebuildExtraKeys(
     var ctrlButton: TextView? = null
     var altButton: TextView? = null
 
-    val bgColor = Color.parseColor("#1A1A2E")
-    val textColor = Color.parseColor("#BB86FC")
-    val strokeColor = Color.parseColor("#BB86FC")
-    val activeTextColor = Color.parseColor("#FFD700")
+    val textColor = Color.parseColor("#E9D5FF") // elegant light purple-white
+    val activeTextColor = Color.parseColor("#FFD700") // golden yellow for active modifiers
+
+    fun createNormalDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#22FFFFFF"), // 13% white highlight at top for reflection
+            Color.parseColor("#08FFFFFF"), // 3% white at middle
+            Color.parseColor("#15000000"), // 8% black shadow at bottom for depth
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#3BFFFFFF")) // 23% white glassy rim
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createPressedDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#5AFFFFFF"), // 35% white highlight at top
+            Color.parseColor("#1EFFFFFF"), // 12% white at middle
+            Color.parseColor("#00000000"), // transparent at bottom
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#80FFFFFF")) // 50% white border
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createActiveDrawable(): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            Color.parseColor("#E67C3AED"), // 90% opaque vibrant violet
+            Color.parseColor("#CC4C1D95")  // 80% opaque deep purple
+        )
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        setStroke(1.dpToPx(context), Color.parseColor("#FFD700")) // Golden border
+        cornerRadius = 8f * context.resources.displayMetrics.density
+    }
+
+    fun createDefaultStateList(): android.graphics.drawable.StateListDrawable = 
+        android.graphics.drawable.StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), createPressedDrawable())
+            addState(intArrayOf(), createNormalDrawable())
+        }
 
     fun updateButtonColors() {
-        ctrlButton?.setTextColor(if (viewClient.ctrlActive) activeTextColor else textColor)
-        altButton?.setTextColor(if (viewClient.altActive) activeTextColor else textColor)
+        ctrlButton?.let { btn ->
+            btn.setTextColor(if (viewClient.ctrlActive) activeTextColor else textColor)
+            btn.background = if (viewClient.ctrlActive) createActiveDrawable() else createDefaultStateList()
+        }
+        altButton?.let { btn ->
+            btn.setTextColor(if (viewClient.altActive) activeTextColor else textColor)
+            btn.background = if (viewClient.altActive) createActiveDrawable() else createDefaultStateList()
+        }
     }
 
     viewClient.onModifierReset = { terminalView.post { updateButtonColors() } }
@@ -471,12 +537,14 @@ private fun rebuildExtraKeys(
             else            -> baseTextSize * 0.7f
         }
 
-        val drawable = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(bgColor)
-            setStroke(1.dpToPx(context), strokeColor)
-            cornerRadius = 5f * context.resources.displayMetrics.density
+        val drawable = if (label == "CTRL") {
+            if (viewClient.ctrlActive) createActiveDrawable() else createDefaultStateList()
+        } else if (label == "ALT") {
+            if (viewClient.altActive) createActiveDrawable() else createDefaultStateList()
+        } else {
+            createDefaultStateList()
         }
+
         return TextView(context).apply {
             text = label
             setTextColor(textColor)
@@ -542,7 +610,7 @@ private fun rebuildExtraKeys(
     // Fixed row height to guarantee identical height for every row
     val rowHeight = 44.dpToPx(context)
 
-    fun addScrollRow(keys: List<String>): LinearLayout {
+    fun addScrollRow(keys: List<ExtraKeyItem>): LinearLayout {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -551,56 +619,68 @@ private fun rebuildExtraKeys(
             )
         }
         
-        for (label in keys) {
-            val displayLabel = getDisplayLabel(label)
-            val btn = makeButton(displayLabel)
-            val action = getActionFor(label)
+        for (item in keys) {
+            val displayLabel = if (item.display.isNotEmpty()) {
+                item.display
+            } else {
+                getDisplayLabel(item.key)
+            }
             
-            when (action) {
-                "CTRL_MOD" -> {
-                    ctrlButton = btn
-                    btn.setOnClickListener {
-                        viewClient.ctrlActive = !viewClient.ctrlActive
-                        if (viewClient.ctrlActive) viewClient.altActive = false
-                        updateButtonColors()
-                    }
+            val btn = makeButton(displayLabel)
+            
+            if (item.macro.isNotEmpty()) {
+                // Execute Macro Directly
+                btn.setOnClickListener {
+                    terminalView.currentSession?.write(item.macro)
                 }
-                "ALT_MOD" -> {
-                    altButton = btn
-                    btn.setOnClickListener {
-                        viewClient.altActive = !viewClient.altActive
-                        if (viewClient.altActive) viewClient.ctrlActive = false
-                        updateButtonColors()
+            } else {
+                val action = getActionFor(item.key)
+                when (action) {
+                    "CTRL_MOD" -> {
+                        ctrlButton = btn
+                        btn.setOnClickListener {
+                            viewClient.ctrlActive = !viewClient.ctrlActive
+                            if (viewClient.ctrlActive) viewClient.altActive = false
+                            updateButtonColors()
+                        }
                     }
-                }
-                "SPECIAL_COPY" -> btn.setOnClickListener { terminalView.showContextMenu() }
-                "SPECIAL_PASTE" -> {
-                    btn.setOnClickListener {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.primaryClip?.let { clip ->
-                            if (clip.itemCount > 0) {
-                                val textToPaste = clip.getItemAt(0).text?.toString() ?: ""
-                                terminalView.currentSession?.write(textToPaste)
+                    "ALT_MOD" -> {
+                        altButton = btn
+                        btn.setOnClickListener {
+                            viewClient.altActive = !viewClient.altActive
+                            if (viewClient.altActive) viewClient.ctrlActive = false
+                            updateButtonColors()
+                        }
+                    }
+                    "SPECIAL_COPY" -> btn.setOnClickListener { terminalView.showContextMenu() }
+                    "SPECIAL_PASTE" -> {
+                        btn.setOnClickListener {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.primaryClip?.let { clip ->
+                                if (clip.itemCount > 0) {
+                                    val textToPaste = clip.getItemAt(0).text?.toString() ?: ""
+                                    terminalView.currentSession?.write(textToPaste)
+                                }
                             }
                         }
                     }
-                }
-                else -> {
-                    val fireAction = {
-                        sendModifiedSequence(
-                            terminalView, action, viewClient.ctrlActive, viewClient.altActive,
-                            onConsumed = {
-                                viewClient.ctrlActive = false
-                                viewClient.altActive = false
-                                updateButtonColors()
-                            }
-                        )
-                    }
+                    else -> {
+                        val fireAction = {
+                            sendModifiedSequence(
+                                terminalView, action, viewClient.ctrlActive, viewClient.altActive,
+                                onConsumed = {
+                                    viewClient.ctrlActive = false
+                                    viewClient.altActive = false
+                                    updateButtonColors()
+                                }
+                            )
+                        }
 
-                    if (label.uppercase() in listOf("UP", "DOWN", "LEFT", "RIGHT")) {
-                        setRepeatClickListener(btn, fireAction)
-                    } else {
-                        btn.setOnClickListener { fireAction() }
+                        if (item.key.uppercase() in listOf("UP", "DOWN", "LEFT", "RIGHT")) {
+                            setRepeatClickListener(btn, fireAction)
+                        } else {
+                            btn.setOnClickListener { fireAction() }
+                        }
                     }
                 }
             }
@@ -613,10 +693,24 @@ private fun rebuildExtraKeys(
         val jsonArray = JSONArray(jsonString)
         for (i in 0 until jsonArray.length()) {
             val rowArray = jsonArray.getJSONArray(i)
-            val rowKeys = mutableListOf<String>()
+            val rowKeys = mutableListOf<ExtraKeyItem>()
+            
             for (j in 0 until rowArray.length()) {
-                rowKeys.add(rowArray.getString(j))
+                val item = rowArray.get(j)
+                when (item) {
+                    is String -> {
+                        rowKeys.add(ExtraKeyItem(key = item))
+                    }
+                    is JSONObject -> {
+                        rowKeys.add(ExtraKeyItem(
+                            key = item.optString("key", ""),
+                            macro = item.optString("macro", ""),
+                            display = item.optString("display", "")
+                        ))
+                    }
+                }
             }
+            
             scrollParent.addView(addScrollRow(rowKeys))
             
             // Fixed column row – same height as scroll rows
@@ -634,13 +728,19 @@ private fun rebuildExtraKeys(
                 fixedRow.addView(editBtn)
             } else {
                 // Placeholder with same height as the corresponding row's first button
-                val placeholderText = getDisplayLabel(rowKeys.firstOrNull() ?: "ESC")
+                val placeholderText = if (rowKeys.isNotEmpty()) {
+                    if (rowKeys.first().display.isNotEmpty()) rowKeys.first().display else getDisplayLabel(rowKeys.first().key)
+                } else {
+                    "ESC"
+                }
+                
                 val spaceBtn = makeButton(placeholderText, isTransparent = true, isFixed = true)
                 fixedRow.addView(spaceBtn)
             }
             fixedParent.addView(fixedRow)
         }
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 

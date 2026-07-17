@@ -13,6 +13,7 @@ import app.xodos2.wayland.input.HardwareKeyboardRouter
 import app.xodos2.wayland.input.InputRouteState
 import app.xodos2.ui.AppScreen
 import app.xodos2.ui.theme.xodos2Theme
+import app.xodos2.ui.CrashHandler
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -23,15 +24,20 @@ class MainActivity : ComponentActivity() {
     private var startInTerminal by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        volumeControlStream = AudioManager.STREAM_MUSIC
-        startInTerminal = intent?.action == ACTION_OPEN_TERMINAL
-        setContent {
-            xodos2Theme {
-                AppScreen(startInTerminal = startInTerminal)
-            }
+    super.onCreate(savedInstanceState)
+    volumeControlStream = AudioManager.STREAM_MUSIC
+    startInTerminal = intent?.action == ACTION_OPEN_TERMINAL
+
+    // ----- NEW: global crash handler -----
+    CrashHandler.install(this)
+    // ------------------------------------
+
+    setContent {
+        xodos2Theme {
+            AppScreen(startInTerminal = startInTerminal)
         }
     }
+}
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)

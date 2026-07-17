@@ -1842,20 +1842,25 @@ if (showDeleteConfirmation != null) {
             Text("This will permanently remove the installed distro and all its files from container $containerId. This action cannot be undone.\n\nAre you sure?")
         },
         confirmButton = {
-            TextButton(onClick = {
-            deleteInProgress = true      
-                scope.launch {
-                    if (NativeInstallCoordinator.deleteContainerContents(context, containerId)) {
-                        refreshContainerState()
-                        refreshLegacyFlags()
-                    }
+    TextButton(onClick = {
+        showDeleteConfirmation = null   // close the dialog
+        deleteInProgress = true         // show loading overlay
+        scope.launch {
+            try {
+                if (NativeInstallCoordinator.deleteContainerContents(context, containerId)) {
+                    refreshContainerState()
+                    refreshLegacyFlags()
                 }
-                showDeleteConfirmation = null
-                deleteInProgress = false  
-            }) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+            } finally {
+                deleteInProgress = false   // hide overlay when done
             }
-        },
+        }
+    }) {
+        Text("Delete", color = MaterialTheme.colorScheme.error)
+    }
+},
+        
+        
         dismissButton = {
             TextButton(onClick = { showDeleteConfirmation = null }) {
                 Text("Cancel")
