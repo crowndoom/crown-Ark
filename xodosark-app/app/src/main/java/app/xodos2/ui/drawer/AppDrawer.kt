@@ -1,13 +1,16 @@
 package app.xodos2.ui.drawer
 
+import android.os.Build
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.blur
 import app.xodos2.ui.glass.glassBlurModifier
 
 @Composable
@@ -37,6 +41,7 @@ fun AppDrawer(
         drawerState = drawerState,
         // Disable edge-swipe to open, but keep swipe-to-dismiss once open.
         gesturesEnabled = drawerState.isOpen,
+        scrimColor = Color(0x4007040E), // customized elegant transparent dark-violet tinted scrim
         drawerContent = {
             Surface(
                 modifier = Modifier
@@ -77,7 +82,22 @@ fun AppDrawer(
             }
         },
     ) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
+        val isOpeningOrOpen = drawerState.targetValue == DrawerValue.Open
+        val animatedBlur by androidx.compose.animation.core.animateDpAsState(
+            targetValue = if (isOpeningOrOpen) 14.dp else 0.dp,
+            animationSpec = androidx.compose.animation.core.spring(
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+            ),
+            label = "drawerBlur"
+        )
+        val contentModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && animatedBlur > 0.dp) {
+            Modifier
+                .fillMaxSize()
+                .blur(animatedBlur)
+        } else {
+            Modifier.fillMaxSize()
+        }
+        Box(modifier = contentModifier, contentAlignment = Alignment.TopStart) {
             content()
         }
     }
