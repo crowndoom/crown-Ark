@@ -92,6 +92,27 @@ import java.io.InputStreamReader
 
 import android.view.WindowManager
 
+fun Modifier.glassDialogStyle(): Modifier = this
+    .background(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xE6131124), // deep frosted glass background
+                Color(0xF20B0F19)
+            )
+        ),
+        shape = RoundedCornerShape(24.dp)
+    )
+    .border(
+        width = 1.dp,
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.28f),
+                Color.White.copy(alpha = 0.05f)
+            )
+        ),
+        shape = RoundedCornerShape(24.dp)
+    )
+
 private val VULKAN_MODES = listOf("LLVMPIPE", "VENUS", "TURNIP")
 private val OPENGL_MODES = listOf("LLVMPIPE", "VIRGL", "ZINK", "GL4ES")
 
@@ -1488,10 +1509,12 @@ if (bootstrapInProgress) {
 if (bootstrapError != null) {
     AlertDialog(
         onDismissRequest = { bootstrapError = null },
-        title = { Text("Extra drivers installation") },
-        text = { Text(bootstrapError ?: "") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Extra drivers installation", fontWeight = FontWeight.Bold, color = Color.White) },
+        text = { Text(bootstrapError ?: "", color = Color.White.copy(alpha = 0.85f)) },
         confirmButton = {
-            TextButton(onClick = { bootstrapError = null }) { Text("OK") }
+            TextButton(onClick = { bootstrapError = null }) { Text("OK", color = Color(0xFFC3B6F9), fontWeight = FontWeight.Bold) }
         }
     )
 }
@@ -1500,30 +1523,35 @@ if (bootstrapError != null) {
 if (bootstrapDownloadInProgress) {
     AlertDialog(
         onDismissRequest = { /* cannot dismiss while downloading */ },
-        title = { Text("Downloading Extra drivers archive (200-Mb)") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Downloading Extra drivers archive (200-Mb)", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (bootstrapDownloadProgress.first >= 0) {
                     LinearProgressIndicator(
                         progress = { bootstrapDownloadProgress.first / 100f },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFFC3B6F9),
+                        trackColor = Color.White.copy(alpha = 0.1f)
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         bootstrapDownloadProgress.second,
+                        color = Color.White.copy(alpha = 0.85f),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 } else {
                     Text(
                         bootstrapDownloadProgress.second,
-                        color = MaterialTheme.colorScheme.error
+                        color = Color(0xFFFF6B6B)
                     )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = { bootstrapDownloadInProgress = false }) {
-                Text("Cancel")
+                Text("Cancel", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
             }
         }
     )
@@ -1533,13 +1561,15 @@ if (installDone) {
     // Full‑screen surface to avoid the default window background
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = Color(0xFF07040E)
     ) {
         // The dialog itself – no way to close it except the Restart button
         AlertDialog(
             onDismissRequest = { /* blocked – cannot be dismissed */ },
-            title = { Text("Setup complete") },
-            text = { Text("Restart the app to apply the new container.\n\nPlease press Restart.") },
+            containerColor = Color.Transparent,
+            modifier = Modifier.glassDialogStyle(),
+            title = { Text("Setup complete", fontWeight = FontWeight.Bold, color = Color.White) },
+            text = { Text("Restart the app to apply the new container.\n\nPlease press Restart.", color = Color.White.copy(alpha = 0.85f)) },
             confirmButton = {
                 TextButton(onClick = {
                     val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
@@ -1550,7 +1580,7 @@ if (installDone) {
                         (context as? Activity)?.finish()
                     }
                 }) {
-                    Text("Restart")
+                    Text("Restart", color = Color(0xFFC3B6F9), fontWeight = FontWeight.Bold)
                 }
             }
             // No dismissButton → the dialog cannot be closed at all
@@ -1568,34 +1598,40 @@ if (showTurnipDriverDialog) {
             // Prevent dismiss while download is in progress
             if (!isDownloading) showTurnipDriverDialog = false
         },
-        title = { Text("Turnip drivers needed") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Turnip drivers needed", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Column {
                 if (!isDownloading) {
                     // Pre‑download summary
-                    Text("Turnip Vulkan driver not found for containers:")
+                    Text("Turnip Vulkan driver not found for containers:", color = Color.White.copy(alpha = 0.85f))
                     Spacer(Modifier.height(8.dp))
                     turnipMissingContainers.forEach { id ->
                         val distro = DisplayOrchestrator.getContainerDistroType(context, id) ?: "unknown"
-                        Text("• Container $id ($distro)")
+                        Text("• Container $id ($distro)", color = Color.White.copy(alpha = 0.85f))
                     }
-                    Text("\nDo you want to download and install them now?")
+                    Text("\nDo you want to download and install them now?", color = Color.White.copy(alpha = 0.85f))
                 } else {
                     // Download progress
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                        CircularProgressIndicator(modifier = Modifier.size(48.dp), color = Color(0xFFC3B6F9))
                         Spacer(Modifier.height(16.dp))
                         Text(
                             turnipDownloadProgress.second,
+                            color = Color.White.copy(alpha = 0.85f),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(12.dp))
                         LinearProgressIndicator(
                             progress = { turnipDownloadProgress.first / 100f },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color(0xFFC3B6F9),
+                            trackColor = Color.White.copy(alpha = 0.1f)
                         )
                         Text(
                             "${turnipDownloadProgress.first}%",
+                            color = Color.White.copy(alpha = 0.65f),
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -1610,7 +1646,7 @@ if (showTurnipDriverDialog) {
                     // You can implement cancellation logic here if needed
                     // For now, just allow closing only after completion
                 }) {
-                    Text("Downloading…")
+                    Text("Downloading…", color = Color.White.copy(alpha = 0.5f))
                 }
             } else {
                 TextButton(onClick = {
@@ -1623,7 +1659,7 @@ if (showTurnipDriverDialog) {
                         showTurnipDriverDialog = false
                     }
                 }) {
-                    Text("Download & Install")
+                    Text("Download & Install", color = Color(0xFFC3B6F9), fontWeight = FontWeight.Bold)
                 }
             }
         },
@@ -1632,7 +1668,7 @@ if (showTurnipDriverDialog) {
                 TextButton(onClick = {
                     showTurnipDriverDialog = false
                 }) {
-                    Text("Cancel")
+                    Text("Cancel", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
                 }
             } else {
                 // Optionally add a "Cancel download" button here
@@ -1653,12 +1689,14 @@ if (showTurnipDriverDialog) {
             confirmOverwriteContinuation?.cancel()
             confirmOverwriteContinuation = null
         },
-        title = { Text("Select installation slot") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Select installation slot", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Column {
                 val target = distro?.distroName ?: "archive"
-                Text("Install \"$target\" to which container?")
-                Spacer(modifier = Modifier.height(12.dp))
+                Text("Install \"$target\" to which container?", color = Color.White.copy(alpha = 0.85f))
+                Spacer(modifier = Modifier.height(16.dp))
                 for (id in 1..3) {
                     val occupied = when (id) {
                         1 -> hasContainer1
@@ -1678,13 +1716,29 @@ if (showTurnipDriverDialog) {
                                 pendingLocalUri = null
                             
                         },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         colors = if (occupied) ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ) else ButtonDefaults.buttonColors()
+                            containerColor = Color(0xFFFF6B6B).copy(alpha = 0.15f),
+                            contentColor = Color(0xFFFF8B8B)
+                        ) else ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFC3B6F9).copy(alpha = 0.15f),
+                            contentColor = Color(0xFFE2DCF9)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = if (occupied) listOf(
+                                    Color(0xFFFF6B6B).copy(alpha = 0.3f),
+                                    Color(0xFFFF6B6B).copy(alpha = 0.05f)
+                                ) else listOf(
+                                    Color(0xFFC3B6F9).copy(alpha = 0.3f),
+                                    Color(0xFFC3B6F9).copy(alpha = 0.05f)
+                                )
+                            )
+                        )
                     ) {
-                        Text(label)
+                        Text(label, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -1694,7 +1748,7 @@ if (showTurnipDriverDialog) {
                 showSlotPicker = false
                 pendingDistro = null
                 pendingLocalUri = null
-            }) { Text("Cancel") }
+            }) { Text("Cancel", color = Color.White.copy(alpha = 0.6f)) }
         }
     )
 }
@@ -1708,21 +1762,23 @@ if (pendingOverwriteSlot != null) {
             confirmOverwriteContinuation?.resumeWith(Result.success(false))
             confirmOverwriteContinuation = null
         },
-        title = { Text("Overwrite container $slot?") },
-        text = { Text("This container already has a rootfs installed. All its files will be deleted and replaced. Make sure to backup if needed.") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Overwrite container $slot?", fontWeight = FontWeight.Bold, color = Color.White) },
+        text = { Text("This container already has a rootfs installed. All its files will be deleted and replaced. Make sure to backup if needed.", color = Color.White.copy(alpha = 0.85f)) },
         confirmButton = {
             TextButton(onClick = {
                 pendingOverwriteSlot = null
                 confirmOverwriteContinuation?.resumeWith(Result.success(true))
                 confirmOverwriteContinuation = null
-            }) { Text("Overwrite") }
+            }) { Text("Overwrite", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
             TextButton(onClick = {
                 pendingOverwriteSlot = null
                 confirmOverwriteContinuation?.resumeWith(Result.success(false))
                 confirmOverwriteContinuation = null
-            }) { Text("Cancel") }
+            }) { Text("Cancel", color = Color.White.copy(alpha = 0.6f)) }
         }
     )
 }
@@ -1868,9 +1924,11 @@ if (showDeleteConfirmation != null) {
     val containerId = showDeleteConfirmation!!
     AlertDialog(
         onDismissRequest = { showDeleteConfirmation = null },
-        title = { Text("⚠️ Delete container $containerId?") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("⚠️ Delete container $containerId?", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
-            Text("This will permanently remove the installed distro and all its files from container $containerId. This action cannot be undone.\n\nAre you sure?")
+            Text("This will permanently remove the installed distro and all its files from container $containerId. This action cannot be undone.\n\nAre you sure?", color = Color.White.copy(alpha = 0.85f))
         },
         confirmButton = {
             TextButton(onClick = {
@@ -1882,12 +1940,12 @@ if (showDeleteConfirmation != null) {
                 }
                 showDeleteConfirmation = null
             }) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+                Text("Delete", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = { showDeleteConfirmation = null }) {
-                Text("Cancel")
+                Text("Cancel", color = Color.White.copy(alpha = 0.6f))
             }
         }
     )
@@ -1901,9 +1959,11 @@ if (showNativeContainerPrompt != null) {
         onDismissRequest = {
             showNativeContainerPrompt = null
         },
-        title = { Text("Use as native terminal?") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Use as native terminal?", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
-            Text("Container $containerId can be set up as a native Android terminal (using the Extra drivers packages).\n\nThis will mark the container as installed without downloading a distribution.\n\nDo you want to continue?")
+            Text("Container $containerId can be set up as a native Android terminal (using the Extra drivers packages).\n\nThis will mark the container as installed without downloading a distribution.\n\nDo you want to continue?", color = Color.White.copy(alpha = 0.85f))
         },
         confirmButton = {
             TextButton(onClick = {
@@ -1911,7 +1971,7 @@ if (showNativeContainerPrompt != null) {
                 showNativeContainerPrompt = null
                 Toast.makeText(context, "Container $containerId set as native terminal", Toast.LENGTH_SHORT).show()
             }) {
-                Text("Yes, use as native")
+                Text("Yes, use as native", color = Color(0xFFC3B6F9), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -1919,7 +1979,7 @@ if (showNativeContainerPrompt != null) {
                 showNativeContainerPrompt = null
                 proceedToDistroSelection(containerId)
             }) {
-                Text("No, install a distro")
+                Text("No, install a distro", color = Color.White.copy(alpha = 0.6f))
             }
         }
     )
@@ -1928,9 +1988,11 @@ if (showNativeContainerPrompt != null) {
 if (showCleanCacheConfirmation) {
     AlertDialog(
         onDismissRequest = { showCleanCacheConfirmation = false },
-        title = { Text("⚠️ Clean downloaded archives?") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("⚠️ Clean downloaded archives?", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
-            Text("All distribution tarballs (*.tar.xz) stored in the app’s cache will be deleted. If you want to install a distro again later, you’ll have to re‑download it.\n\nDo you want to continue?")
+            Text("All distribution tarballs (*.tar.xz) stored in the app’s cache will be deleted. If you want to install a distro again later, you’ll have to re‑download it.\n\nDo you want to continue?", color = Color.White.copy(alpha = 0.85f))
         },
         confirmButton = {
             TextButton(onClick = {
@@ -1939,12 +2001,12 @@ if (showCleanCacheConfirmation) {
                 }
                 showCleanCacheConfirmation = false
             }) {
-                Text("Clean", color = MaterialTheme.colorScheme.error)
+                Text("Clean", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = { showCleanCacheConfirmation = false }) {
-                Text("Cancel")
+                Text("Cancel", color = Color.White.copy(alpha = 0.6f))
             }
         }
     )
@@ -1954,23 +2016,25 @@ if (showCleanCacheConfirmation) {
 if (showExitDialog) {
     AlertDialog(
         onDismissRequest = { showExitDialog = false },
-        title = { Text("Exit") },
-        text = { Text("Are you sure you want to exit?") },
+        containerColor = Color.Transparent,
+        modifier = Modifier.glassDialogStyle(),
+        title = { Text("Exit", fontWeight = FontWeight.Bold, color = Color.White) },
+        text = { Text("Are you sure you want to exit?", color = Color.White.copy(alpha = 0.85f)) },
         confirmButton = {
             TextButton(onClick = {
-    showExitDialog = false
-    // 1. Stop the X11 server service
-    val x11Intent = Intent(context, X11ServerService::class.java)
-    context.stopService(x11Intent)
+                showExitDialog = false
+                // 1. Stop the X11 server service
+                val x11Intent = Intent(context, X11ServerService::class.java)
+                context.stopService(x11Intent)
 
-    // 2. the entire app process, just like Android’s Force Stop
-    //    finishAffinity() ensures all activities are removed from the stack
-    (context as? Activity)?.finishAffinity()
-    System.exit(0)
-}) { Text("Yes") }
+                // 2. the entire app process, just like Android’s Force Stop
+                //    finishAffinity() ensures all activities are removed from the stack
+                (context as? Activity)?.finishAffinity()
+                System.exit(0)
+            }) { Text("Yes", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
-            TextButton(onClick = { showExitDialog = false }) { Text("No") }
+            TextButton(onClick = { showExitDialog = false }) { Text("No", color = Color.White.copy(alpha = 0.6f)) }
         }
     )
 }
@@ -2025,8 +2089,8 @@ if (showDistroSelection) {
                         fontWeight = FontWeight.Black,
                         color = Color.White,
                         style = MaterialTheme.typography.headlineMedium.copy(
-                            fontSize = 32.sp,
-                            letterSpacing = (-1.2).sp
+                            fontSize = 38.sp,
+                            letterSpacing = (-1.5).sp
                         )
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -2035,8 +2099,8 @@ if (showDistroSelection) {
                         fontWeight = FontWeight.ExtraBold,
                         color = Color(0xFFC3B6F9),
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 15.sp,
-                            letterSpacing = 1.2.sp
+                            fontSize = 18.sp,
+                            letterSpacing = 1.5.sp
                         )
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -2310,10 +2374,11 @@ if (showDistroSelection) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = distro.distroName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() },
-                                                fontWeight = FontWeight.ExtraBold,
+                                                fontWeight = FontWeight.Black,
                                                 color = Color.White,
                                                 style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontSize = 21.sp
+                                                    fontSize = 25.sp,
+                                                    letterSpacing = (-0.5).sp
                                                 )
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
@@ -2410,8 +2475,18 @@ if (showDistroSelection) {
 
 
     // ── Original main UI (drawer + terminal/desktop) ────────────
+    val isAnyDialogVisible = showContainerManager || 
+                             showDeleteConfirmation != null || 
+                             showCleanCacheConfirmation || 
+                             showNativeContainerPrompt != null || 
+                             showSlotPicker || 
+                             showTurnipDriverDialog || 
+                             showExitDialog ||
+                             bootstrapDownloadInProgress
+
     AppDrawer(
         drawerState = drawerState,
+        isBackgroundBlurred = isAnyDialogVisible,
         drawerContent = {
       
 
