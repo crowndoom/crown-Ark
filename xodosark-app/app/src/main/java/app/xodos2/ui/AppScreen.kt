@@ -1729,7 +1729,29 @@ if (pendingOverwriteSlot != null) {
 if (showContainerManager) {
     AlertDialog(
         onDismissRequest = { showContainerManager = false },
-        title = { Text("Container Manager") },
+        containerColor = Color.Transparent,
+        modifier = Modifier
+            .then(glassBlurModifier())
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xE6131124), // deep frosted glass background
+                        Color(0xF20B0F19)
+                    )
+                ),
+                shape = RoundedCornerShape(24.dp)
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.28f),
+                        Color.White.copy(alpha = 0.05f)
+                    )
+                ),
+                shape = RoundedCornerShape(24.dp)
+            ),
+        title = { Text("Container Manager", fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Column {
                 for (id in 1..3) {
@@ -1742,81 +1764,101 @@ if (showContainerManager) {
                     ) {
                         Text(
                             "Container $id" + if (occupied) " (installed)" else " (empty)",
+                            color = Color.White,
                             modifier = Modifier.weight(1f)
                         )
                         // Install button
-                        // Install button
-IconButton(onClick = {
-    showContainerManager = false
-    handleContainerInstallClick(id)
-}) {
-    Icon(
-        imageVector = Icons.Default.AddCircle,
-        contentDescription = "Install to container $id",
-        tint = MaterialTheme.colorScheme.primary
-    )
-}
+                        IconButton(onClick = {
+                            showContainerManager = false
+                            handleContainerInstallClick(id)
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.AddCircle,
+                                contentDescription = "Install to container $id",
+                                tint = Color(0xFFC3B6F9)
+                            )
+                        }
                         if (occupied) {
                             // Delete button – shows confirmation instead of immediate delete
                             IconButton(onClick = {
                                 showDeleteConfirmation = id
                             }) {
-                                Icon(Icons.Default.Delete, "Delete")
+                                Icon(Icons.Default.Delete, "Delete", tint = Color(0xFFFF6B6B))
                             }
                             // Backup button
                             IconButton(onClick = {
                                 pendingContainerForBackup = id
                                 backupFilePicker.launch("container${id}_backup.tar.xz")
                             }) {
-                                Icon(Icons.Default.Save, "Backup")
+                                Icon(Icons.Default.Save, "Backup", tint = Color(0xFFE9D5FF))
                             }
                         }
                     }
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.15f))
 
-// ---Install bootstrap packages button ---
-Button(
-    onClick = {
-        showContainerManager = false
-        pickBootstrapFile.launch(arrayOf("application/x-xz", "*/*"))
-    },
-    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    colors = ButtonDefaults.buttonColors(
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-    )
-) {
-    Text("Install Extra drivers packages")
-}
-
-
-// ---Download bootstrap archive button ---
-Button(
-    onClick = {
-        showContainerManager = false
-        downloadBootstrapArchive()
-    },
-    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-    colors = ButtonDefaults.buttonColors(
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-    )
-) {
-    Text("Download Extra drivers archive (200-Mb)")
-}
+                // ---Install bootstrap packages button ---
+                Button(
+                    onClick = {
+                        showContainerManager = false
+                        pickBootstrapFile.launch(arrayOf("application/x-xz", "*/*"))
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.07f),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.22f),
+                                Color.White.copy(alpha = 0.03f)
+                            )
+                        )
+                    )
+                ) {
+                    Text("Install Extra drivers packages", fontWeight = FontWeight.Bold)
+                }
 
 
-// Clean cache button
-TextButton(onClick = {
-    showCleanCacheConfirmation = true
-}) {
-    Text("Clean cache tarballs (*.tar.xz)")
-}
+                // ---Download bootstrap archive button ---
+                Button(
+                    onClick = {
+                        showContainerManager = false
+                        downloadBootstrapArchive()
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White.copy(alpha = 0.07f),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.22f),
+                                Color.White.copy(alpha = 0.03f)
+                            )
+                        )
+                    )
+                ) {
+                    Text("Download Extra drivers archive (200-Mb)", fontWeight = FontWeight.Bold)
+                }
+
+
+                // Clean cache button
+                TextButton(onClick = {
+                    showCleanCacheConfirmation = true
+                }) {
+                    Text("Clean cache tarballs (*.tar.xz)", color = Color(0xFFC3B6F9))
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { showContainerManager = false }) { Text("Close") }
+            TextButton(onClick = { showContainerManager = false }) { Text("Close", color = Color.White) }
         }
     )
 }
