@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.xodos2.ui.glass.glassBlurModifier
 
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -95,9 +94,8 @@ fun DrawerDropdownField(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            offset = DpOffset(x = 265.dp, y = (-40).dp),
+            offset = DpOffset(x = (-320).dp, y = (-40).dp),
             modifier = Modifier
-                .then(glassBlurModifier())
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
