@@ -113,7 +113,8 @@ fun DesktopLaunchersSection(
                 }
                 DropdownMenu(
                     expanded = manualDropdownExpanded,
-                    onDismissRequest = { manualDropdownExpanded = false }
+                    onDismissRequest = { manualDropdownExpanded = false },
+                    offset = androidx.compose.ui.unit.DpOffset(x = (-320).dp, y = 0.dp)
                 ) {
                     DesktopDetector.knownBinaries.forEach { (binary, name) ->
                         DropdownMenuItem(
@@ -151,7 +152,7 @@ fun DesktopLaunchersSection(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                app.xodos2.ui.glass.GlassButton(onClick = {
                     saveCustomScript(prefs, containerId, binary, editScript.trim())
                     editingBinary = null
                 }) {
@@ -161,7 +162,7 @@ fun DesktopLaunchersSection(
             dismissButton = {
                 Row {
                     // Reset button – restore the default script
-                    TextButton(onClick = {
+                    app.xodos2.ui.glass.GlassButton(onClick = {
                         editScript = DesktopDetector.defaultLaunchScript(binary)
                         // Optionally delete the saved custom script so the default becomes permanent
                         deleteCustomScript(prefs, containerId, binary)
@@ -169,7 +170,7 @@ fun DesktopLaunchersSection(
                         Text("Reset", color = MaterialTheme.colorScheme.error)
                     }
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = { editingBinary = null }) {
+                    app.xodos2.ui.glass.GlassButton(onClick = { editingBinary = null }) {
                         Text("Cancel")
                     }
                 }
