@@ -84,9 +84,9 @@ object DesktopDetector {
                 export XDG_SESSION_DESKTOP=gnome
                 
                 if [ "${'$'}XDG_SESSION_TYPE" = "wayland" ]; then
-                    exec dbus-run-session gnome-shell --wayland
+                    exec dbus-run-session gnome-shell --wayland &
                 else
-                    exec dbus-run-session gnome-shell --x11
+                    exec dbus-run-session gnome-shell --x11 &
                 fi
                 """.trimIndent()
 
@@ -94,38 +94,38 @@ object DesktopDetector {
                 killall -9 startplasma-x11 startplasma-wayland startplasma* 2>/dev/null
                 export DESKTOP_SESSION=plasma
                 export XDG_CURRENT_DESKTOP=KDE
-                exec dbus-run-session startplasma-x11
+                exec dbus-run-session startplasma-x11 &
                 """.trimIndent()
 
             "startplasma-wayland" -> """
                 killall -9 startplasma-x11 startplasma-wayland startplasma* 2>/dev/null
                 export DESKTOP_SESSION=plasma
                 export XDG_CURRENT_DESKTOP=KDE
-                exec dbus-run-session startplasma-wayland
+                exec dbus-run-session startplasma-wayland &
                 """.trimIndent()
 
             "xfce4-session" -> """
                 killall -9 xfce4-session xfce4* 2>/dev/null
                 export XDG_CURRENT_DESKTOP=XFCE
-                exec dbus-run-session xfce4-session
+                exec dbus-run-session xfce4-session &
                 """.trimIndent()
 
             "lxqt-session" -> """
                 killall -9 lxqt-session lxqt* 2>/dev/null
                 export XDG_CURRENT_DESKTOP=LXQt
-                exec dbus-run-session lxqt-session
+                exec dbus-run-session lxqt-session &
                 """.trimIndent()
 
             "mate-session" -> """
                 killall -9 mate-session mate* 2>/dev/null
                 export XDG_CURRENT_DESKTOP=MATE
-                exec dbus-run-session mate-session
+                exec dbus-run-session mate-session &
                 """.trimIndent()
 
             "cinnamon-session" -> """
                 killall -9 cinnamon-session cinnamon* 2>/dev/null
                 export XDG_CURRENT_DESKTOP=Cinnamon
-                exec dbus-run-session cinnamon-session
+                exec dbus-run-session cinnamon-session &
                 """.trimIndent()
 
             else -> "exec dbus-run-session $binary"
