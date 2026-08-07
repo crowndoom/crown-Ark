@@ -239,9 +239,12 @@ object VortekAssets {
             File(icdDir1, "vortek_icd.aarch64.json").writeText(icdJsonContent)
             File(icdDir2, "vortek_icd.aarch64.json").writeText(icdJsonContent)
 
-            // Delete any stock/conflicting samsung ICD json files
-            icdDir1.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
-            icdDir2.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
+            // Delete any stock/conflicting samsung ICD json files across all ICD directories in rootfs
+            listOf(icdDir1, icdDir2, File(rootfs, "vendor/etc/vulkan/icd.d"), File(rootfs, "system/etc/vulkan/icd.d")).forEach { dir ->
+                if (dir.exists()) {
+                    dir.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
+                }
+            }
 
             // Copy layer json and so files
             vortekDir.listFiles()?.forEach { file ->
@@ -269,6 +272,24 @@ object VortekAssets {
                             sysLog.copyTo(File(dir, "liblog.so"), overwrite = true)
                         } catch (_: Exception) { }
                     }
+                }
+            }
+
+            // Ensure bash.bashrc enforces Vortek and cleans up stock samsung ICDs in every shell
+            val bashrc = File(rootfs, "etc/bash.bashrc")
+            if (bashrc.exists()) {
+                val vortekEnvBlock = """
+                    # VORTEK DRIVER CONFIGURATION
+                    rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json /vendor/etc/vulkan/icd.d/*samsung*.json /system/etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true
+                    export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
+                    export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
+                    export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE
+                    export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d
+                    export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:${'$'}LD_LIBRARY_PATH
+                """.trimIndent()
+                val currentText = bashrc.readText()
+                if (!currentText.contains("VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json")) {
+                    bashrc.appendText("\n" + vortekEnvBlock + "\n")
                 }
             }
         } catch (_: Exception) { }
