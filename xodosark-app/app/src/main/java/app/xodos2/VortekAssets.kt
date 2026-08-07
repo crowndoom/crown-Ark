@@ -239,13 +239,17 @@ object VortekAssets {
             File(icdDir1, "vortek_icd.aarch64.json").writeText(icdJsonContent)
             File(icdDir2, "vortek_icd.aarch64.json").writeText(icdJsonContent)
 
+            // Delete any stock/conflicting samsung ICD json files
+            icdDir1.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
+            icdDir2.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
+
             // Copy layer json and so files
             vortekDir.listFiles()?.forEach { file ->
                 if (file.name.endsWith(".json") && file.name != "meta.json") {
                     if (file.name.contains("layer", ignoreCase = true)) {
                         file.copyTo(File(layerDir1, file.name), overwrite = true)
                         file.copyTo(File(layerDir2, file.name), overwrite = true)
-                    } else {
+                    } else if (!file.name.contains("samsung", ignoreCase = true)) {
                         file.copyTo(File(icdDir1, file.name), overwrite = true)
                         file.copyTo(File(icdDir2, file.name), overwrite = true)
                     }
