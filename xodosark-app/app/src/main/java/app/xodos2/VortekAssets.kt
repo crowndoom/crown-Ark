@@ -255,6 +255,18 @@ object VortekAssets {
                     }
                 }
             }
+
+            // Copy liblog.so from Android system if available to resolve Android driver dependencies
+            listOf("/system/lib64/liblog.so", "/system/lib/liblog.so").forEach { sysPath ->
+                val sysLog = File(sysPath)
+                if (sysLog.exists()) {
+                    for (dir in libDirs) {
+                        try {
+                            sysLog.copyTo(File(dir, "liblog.so"), overwrite = true)
+                        } catch (_: Exception) { }
+                    }
+                }
+            }
         } catch (_: Exception) { }
     }
 
