@@ -287,10 +287,14 @@ object VortekAssets {
                     export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d
                     export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:${'$'}LD_LIBRARY_PATH
                 """.trimIndent()
-                val currentText = bashrc.readText()
-                if (!currentText.contains("VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json")) {
-                    bashrc.appendText("\n" + vortekEnvBlock + "\n")
+                var currentText = bashrc.readText()
+                if (currentText.contains("VK_ICD_FILENAMES")) {
+                    currentText = currentText.replace("VK_ICD_FILENAMES", "OLD_VK_ICD_FILENAMES_REMOVED")
                 }
+                if (!currentText.contains("VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json")) {
+                    currentText += "\n" + vortekEnvBlock + "\n"
+                }
+                bashrc.writeText(currentText)
             }
         } catch (_: Exception) { }
     }
