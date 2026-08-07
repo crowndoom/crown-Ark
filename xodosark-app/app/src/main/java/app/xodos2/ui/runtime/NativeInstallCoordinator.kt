@@ -294,7 +294,15 @@ object NativeInstallCoordinator {
     val envLines = """
 
         # XoDos-ark environment
-        unset GALLIUM_DRIVER MESA_DRIVER_PATH MESA_LOADER_DRIVER_OVERRIDE TU_DEBUG VK_ICD_FILENAMES MESA_VK_WSI_PRESENT_MODE MESA_LOADER_DRIVER_OVERRIDE VKD3D_FEATURE_LEVEL VK_DRIVER_FILES VN_DEBUG || true
+        unset GALLIUM_DRIVER MESA_DRIVER_PATH MESA_LOADER_DRIVER_OVERRIDE TU_DEBUG MESA_VK_WSI_PRESENT_MODE VKD3D_FEATURE_LEVEL VN_DEBUG || true
+        if [ -f /usr/share/vulkan/icd.d/vortek_icd.aarch64.json ]; then
+            rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json /vendor/etc/vulkan/icd.d/*samsung*.json /system/etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true
+            export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
+            export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
+            export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE
+            export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d
+            export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:${'$'}LD_LIBRARY_PATH
+        fi
         export WAYLAND_DISPLAY=wayland-xodos2
         if [ -f /.x11 ]; then
          export DISPLAY=:0
@@ -312,15 +320,13 @@ object NativeInstallCoordinator {
 
     distFile.writeText(stype)
 
-    // Only append the environment block if it's not already present
+    // Update bashrc environment block
     val existing = if (bashrc.exists()) bashrc.readText() else ""
-    if (!existing.contains("# XoDos-ark environment")) {
+    if (!existing.contains("VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json")) {
         try {
-            if (bashrc.exists()) {
-                bashrc.appendText(envLines)
-            } else {
-                bashrc.writeText(envLines.trimStart())
-            }
+            val cleanedExisting = existing.replace("VK_ICD_FILENAMES", "OLD_VK_ICD_FILENAMES_REMOVED")
+            val newContent = if (cleanedExisting.isNotBlank()) cleanedExisting + "\n" + envLines else envLines.trimStart()
+            bashrc.writeText(newContent)
             Log.i("NativeInstall", "bash.bashrc updated with environment for container $containerId")
         } catch (e: Exception) {
             Log.e("NativeInstall", "Failed to write to bash.bashrc", e)
