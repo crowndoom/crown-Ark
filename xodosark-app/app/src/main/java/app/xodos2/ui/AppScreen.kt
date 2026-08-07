@@ -95,8 +95,8 @@ import android.view.WindowManager
 
 import app.xodos2.ui.glassDialogStyle
 
-private val VULKAN_MODES = listOf("LLVMPIPE", "VENUS", "TURNIP")
-private val OPENGL_MODES = listOf("LLVMPIPE", "VIRGL", "ZINK", "GL4ES")
+private val VULKAN_MODES = listOf("LLVMPIPE", "VENUS", "TURNIP", "VORTEK")
+private val OPENGL_MODES = listOf("LLVMPIPE", "VIRGL", "ZINK", "GL4ES", "VORTEK")
 private val VORTEK_MODES = listOf("Disabled", "VORTEK_AUTO", "VORTEK_OPTIMIZED", "VORTEK_COMPAT", "VORTEK_PASSTHROUGH")
 
 private const val X11_MODE_LABEL_NATIVE = "Native"
