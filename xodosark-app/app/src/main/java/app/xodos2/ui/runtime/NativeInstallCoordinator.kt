@@ -301,7 +301,7 @@ object NativeInstallCoordinator {
             export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
             export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE
             export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d
-            export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:${'$'}LD_LIBRARY_PATH
+            export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:${'$'}LD_LIBRARY_PATH
         fi
         export WAYLAND_DISPLAY=wayland-xodos2
         if [ -f /.x11 ]; then
