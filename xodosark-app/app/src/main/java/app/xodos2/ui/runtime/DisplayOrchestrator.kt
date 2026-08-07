@@ -230,6 +230,7 @@ val payload = buildString {
             b.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
             b.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
             b.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
+            b.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:\$LD_LIBRARY_PATH\n")
             b.append("export VORTEK_AUTO_EXTENSIONS=1\n")
             b.append("export VORTEK_OPTIMIZE=1\n")
             val vMode = if (vortekMode != "Disabled") vortekMode else "VORTEK_AUTO"
@@ -312,6 +313,7 @@ val payload = buildString {
             sb.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
             sb.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
             sb.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
+            sb.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:\$LD_LIBRARY_PATH\n")
             sb.append("export VORTEK_AUTO_EXTENSIONS=1\n")
             sb.append("export VORTEK_OPTIMIZE=1\n")
             val vMode = if (vortek != "Disabled") vortek else "VORTEK_AUTO"
