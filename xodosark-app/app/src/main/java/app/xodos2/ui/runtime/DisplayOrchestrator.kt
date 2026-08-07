@@ -226,9 +226,9 @@ val payload = buildString {
         val isVortekActive = vortekMode != "Disabled" || vulkanMode == "VORTEK" || openGLMode == "VORTEK"
 
         if (isVortekActive) {
-            b.append("rm -f /usr/share/vulkan/icd.d/*samsung* /etc/vulkan/icd.d/*samsung* 2>/dev/null || true\n")
-            b.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
-            b.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            b.append("rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json /vendor/etc/vulkan/icd.d/*samsung*.json /system/etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true\n")
+            b.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            b.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
             b.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
             b.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
             b.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:\$LD_LIBRARY_PATH\n")
@@ -310,9 +310,9 @@ val payload = buildString {
         val isVortekActive = vortek != "Disabled" || vulkan == "VORTEK" || openGL == "VORTEK"
 
         if (isVortekActive) {
-            sb.append("rm -f /usr/share/vulkan/icd.d/*samsung* /etc/vulkan/icd.d/*samsung* 2>/dev/null || true\n")
-            sb.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
-            sb.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            sb.append("rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json /vendor/etc/vulkan/icd.d/*samsung*.json /system/etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true\n")
+            sb.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            sb.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
             sb.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
             sb.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
             sb.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:\$LD_LIBRARY_PATH\n")
