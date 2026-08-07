@@ -14,7 +14,7 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
 
 object VortekAssets {
-    private const val ASSET_ROOT = "vortek"
+    private val ASSET_ROOTS = listOf("Vortek_Layer", "vortek")
 
     fun syncFromAssetsIfNeeded(context: Context) {
         synchronized(this) {
@@ -23,26 +23,28 @@ object VortekAssets {
             val vortekDir = File(filesDir, "vortek").apply { mkdirs() }
 
             try {
-                val list = am.list(ASSET_ROOT) ?: emptyArray()
-                val splitParts = mutableListOf<String>()
+                for (assetRoot in ASSET_ROOTS) {
+                    val list = am.list(assetRoot) ?: continue
+                    val splitParts = mutableListOf<String>()
 
-                for (file in list) {
-                    val dest = File(vortekDir, file)
-                    if (isSplitPart(file)) {
-                        splitParts.add(file)
-                    } else {
-                        copyAssetFile(am, "$ASSET_ROOT/$file", dest)
-                        // Auto-decompress if gz or zip
-                        if (file.endsWith(".gz") && !file.endsWith(".tar.gz")) {
-                            decompressGz(dest, File(vortekDir, file.removeSuffix(".gz")))
-                        } else if (file.endsWith(".zip")) {
-                            unzipFile(dest, vortekDir)
+                    for (file in list) {
+                        val dest = File(vortekDir, file)
+                        if (isSplitPart(file)) {
+                            splitParts.add(file)
+                        } else {
+                            copyAssetFile(am, "$assetRoot/$file", dest)
+                            // Auto-decompress if gz or zip
+                            if (file.endsWith(".gz") && !file.endsWith(".tar.gz")) {
+                                decompressGz(dest, File(vortekDir, file.removeSuffix(".gz")))
+                            } else if (file.endsWith(".zip")) {
+                                unzipFile(dest, vortekDir)
+                            }
                         }
                     }
-                }
 
-                if (splitParts.isNotEmpty()) {
-                    concatenateAssetParts(am, splitParts, vortekDir)
+                    if (splitParts.isNotEmpty()) {
+                        concatenateAssetParts(am, assetRoot, splitParts, vortekDir)
+                    }
                 }
             } catch (_: IOException) { }
 
@@ -60,6 +62,7 @@ object VortekAssets {
 
     private fun concatenateAssetParts(
         am: android.content.res.AssetManager,
+        assetRoot: String,
         parts: List<String>,
         outputDir: File
     ) {
@@ -70,7 +73,7 @@ object VortekAssets {
         try {
             FileOutputStream(outputFile).use { out ->
                 for (part in sortedParts) {
-                    am.open("$ASSET_ROOT/$part").use { input ->
+                    am.open("$assetRoot/$part").use { input ->
                         input.copyTo(out)
                     }
                 }
@@ -193,6 +196,8 @@ object VortekAssets {
 
         val icdDir1 = File(rootfs, "usr/share/vulkan/icd.d").apply { mkdirs() }
         val icdDir2 = File(rootfs, "etc/vulkan/icd.d").apply { mkdirs() }
+        val layerDir1 = File(rootfs, "usr/share/vulkan/explicit_layer.d").apply { mkdirs() }
+        val layerDir2 = File(rootfs, "etc/vulkan/explicit_layer.d").apply { mkdirs() }
         val libDirs = listOf(
             File(rootfs, "usr/lib/aarch64-linux-gnu").apply { mkdirs() },
             File(rootfs, "usr/lib").apply { mkdirs() },
@@ -201,21 +206,49 @@ object VortekAssets {
         )
 
         try {
-            val soFiles = vortekDir.listFiles()?.filter { it.name.endsWith(".so") } ?: emptyList()
-            var hasVortekSo = soFiles.any { it.name == "libvulkan_vortek.so" }
+            val allFiles = vortekDir.listFiles() ?: emptyArray()
+            val soFiles = allFiles.filter { it.name.endsWith(".so") }
 
-            // If libvulkan_vortek.so is missing but another .so is present (e.g. vulkan_samsung.so or vulkan.samsung.so), alias it!
-            if (!hasVortekSo && soFiles.isNotEmpty()) {
+            // Ensure vulkan.samsung.so is also available as libvulkan_vortek.so
+            val samsungSo = soFiles.find { it.name == "vulkan.samsung.so" }
+            if (samsungSo != null) {
+                val vortekTarget = File(vortekDir, "libvulkan_vortek.so")
+                if (!vortekTarget.exists()) {
+                    samsungSo.copyTo(vortekTarget, overwrite = true)
+                }
+            } else if (soFiles.isNotEmpty()) {
                 val primarySo = soFiles.first()
                 val vortekTarget = File(vortekDir, "libvulkan_vortek.so")
-                primarySo.copyTo(vortekTarget, overwrite = true)
-                hasVortekSo = true
+                if (!vortekTarget.exists()) {
+                    primarySo.copyTo(vortekTarget, overwrite = true)
+                }
             }
 
+            // Generate vortek_icd.aarch64.json pointing to the Vulkan driver .so
+            val driverSoName = if (File(vortekDir, "vulkan.samsung.so").exists()) "vulkan.samsung.so" else "libvulkan_vortek.so"
+            val icdJsonContent = """
+                {
+                    "file_format_version": "1.0.0",
+                    "ICD": {
+                        "library_path": "$driverSoName",
+                        "api_version": "1.3.0"
+                    }
+                }
+            """.trimIndent()
+
+            File(icdDir1, "vortek_icd.aarch64.json").writeText(icdJsonContent)
+            File(icdDir2, "vortek_icd.aarch64.json").writeText(icdJsonContent)
+
+            // Copy layer json and so files
             vortekDir.listFiles()?.forEach { file ->
-                if (file.name.endsWith(".json")) {
-                    file.copyTo(File(icdDir1, file.name), overwrite = true)
-                    file.copyTo(File(icdDir2, file.name), overwrite = true)
+                if (file.name.endsWith(".json") && file.name != "meta.json") {
+                    if (file.name.contains("layer", ignoreCase = true)) {
+                        file.copyTo(File(layerDir1, file.name), overwrite = true)
+                        file.copyTo(File(layerDir2, file.name), overwrite = true)
+                    } else {
+                        file.copyTo(File(icdDir1, file.name), overwrite = true)
+                        file.copyTo(File(icdDir2, file.name), overwrite = true)
+                    }
                 } else if (file.name.endsWith(".so")) {
                     for (dir in libDirs) {
                         file.copyTo(File(dir, file.name), overwrite = true)
