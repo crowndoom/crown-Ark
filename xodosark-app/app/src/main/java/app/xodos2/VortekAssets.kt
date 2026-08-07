@@ -263,37 +263,51 @@ object VortekAssets {
                 }
             }
 
-            // Copy liblog.so from Android system if available to resolve Android driver dependencies
-            listOf("/system/lib64/liblog.so", "/system/lib/liblog.so").forEach { sysPath ->
-                val sysLog = File(sysPath)
-                if (sysLog.exists()) {
-                    for (dir in libDirs) {
-                        try {
-                            sysLog.copyTo(File(dir, "liblog.so"), overwrite = true)
-                        } catch (_: Exception) { }
+            // Copy libsbwchelper.so, liblog.so and essential Android system/vendor libraries if available to resolve driver dependencies
+            val sysVendorSearchPaths = listOf(
+                "/vendor/lib64", "/vendor/lib",
+                "/system/lib64", "/system/lib",
+                "/vendor/lib64/egl", "/vendor/lib64/hw",
+                "/system/lib64/hw", "/apex/com.android.runtime/lib64"
+            )
+            val neededLibs = listOf(
+                "libsbwchelper.so", "liblog.so", "libhardware.so", "libcutils.so",
+                "libutils.so", "libvndksupport.so", "libion.so", "libsync.so",
+                "libandroid.so", "libui.so", "libgui.so", "libbase.so"
+            )
+
+            for (searchPath in sysVendorSearchPaths) {
+                val dir = File(searchPath)
+                if (!dir.exists() || !dir.isDirectory) continue
+                dir.listFiles()?.forEach { sysFile ->
+                    val name = sysFile.name
+                    if (neededLibs.contains(name) || name.startsWith("libsbwc") || name.startsWith("libsec")) {
+                        for (destDir in libDirs) {
+                            try {
+                                sysFile.copyTo(File(destDir, name), overwrite = true)
+                            } catch (_: Exception) { }
+                        }
                     }
                 }
             }
 
-            // Ensure bash.bashrc enforces Vortek and cleans up stock samsung ICDs in every shell
+            // Ensure bash.bashrc enforces Vortek environment in every interactive shell session
             val bashrc = File(rootfs, "etc/bash.bashrc")
             if (bashrc.exists()) {
                 val vortekEnvBlock = """
                     # VORTEK DRIVER CONFIGURATION
-                    rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json /vendor/etc/vulkan/icd.d/*samsung*.json /system/etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true
+                    rm -f /usr/share/vulkan/icd.d/*samsung*.json /etc/vulkan/icd.d/*samsung*.json 2>/dev/null || true
                     export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
                     export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json
                     export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE
                     export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d
-                    export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:${'$'}LD_LIBRARY_PATH
+                    export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:/lib:/system/lib64:/vendor/lib64:/vendor/lib64/egl:/vendor/lib64/hw:${'$'}LD_LIBRARY_PATH
                 """.trimIndent()
                 var currentText = bashrc.readText()
                 if (currentText.contains("VK_ICD_FILENAMES")) {
                     currentText = currentText.replace("VK_ICD_FILENAMES", "OLD_VK_ICD_FILENAMES_REMOVED")
                 }
-                if (!currentText.contains("VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json")) {
-                    currentText += "\n" + vortekEnvBlock + "\n"
-                }
+                currentText += "\n" + vortekEnvBlock + "\n"
                 bashrc.writeText(currentText)
             }
         } catch (_: Exception) { }
