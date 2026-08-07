@@ -226,8 +226,10 @@ val payload = buildString {
         val isVortekActive = vortekMode != "Disabled" || vulkanMode == "VORTEK" || openGLMode == "VORTEK"
 
         if (isVortekActive) {
-            b.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
-            b.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            b.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            b.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            b.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
+            b.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
             b.append("export VORTEK_AUTO_EXTENSIONS=1\n")
             b.append("export VORTEK_OPTIMIZE=1\n")
             val vMode = if (vortekMode != "Disabled") vortekMode else "VORTEK_AUTO"
@@ -249,8 +251,15 @@ val payload = buildString {
                 b.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
                 b.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/gl4es:\$LD_LIBRARY_PATH\n")
             }
-            "ZINK" -> {
-                if (vulkanMode == "TURNIP") {
+            "ZINK", "VORTEK" -> {
+                b.append("export VKD3D_FEATURE_LEVEL=12_0\n")
+                b.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")
+                b.append("export GALLIUM_DRIVER=zink\n")
+                b.append("export MESA_VK_WSI_PRESENT_MODE=mailbox\n")
+                b.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
+            }
+            else -> {
+                if (isVortekActive) {
                     b.append("export VKD3D_FEATURE_LEVEL=12_0\n")
                     b.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")
                     b.append("export GALLIUM_DRIVER=zink\n")
@@ -262,12 +271,6 @@ val payload = buildString {
                     b.append("export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe\n")
                     b.append("export LIBGL_ALWAYS_SOFTWARE=1\n")
                 }
-            }
-            else -> {
-                b.append("unset GALLIUM_DRIVER MESA_DRIVER_PATH MESA_LOADER_DRIVER_OVERRIDE TU_DEBUG MESA_GL_VERSION_OVERRIDE LIBGL_FB MESA_VK_WSI_PRESENT_MODE VKD3D_FEATURE_LEVEL VN_DEBUG || true\n")             
-                b.append("export GALLIUM_DRIVER=llvmpipe\n")
-                b.append("export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe\n")
-                b.append("export LIBGL_ALWAYS_SOFTWARE=1\n")
             }
         }
 
@@ -305,8 +308,10 @@ val payload = buildString {
         val isVortekActive = vortek != "Disabled" || vulkan == "VORTEK" || openGL == "VORTEK"
 
         if (isVortekActive) {
-            sb.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
-            sb.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            sb.append("export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            sb.append("export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/vortek_icd.aarch64.json:/etc/vulkan/icd.d/vortek_icd.aarch64.json\n")
+            sb.append("export VK_INSTANCE_LAYERS=VK_LAYER_VORTEK_XCLIPSE\n")
+            sb.append("export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d:/etc/vulkan/explicit_layer.d\n")
             sb.append("export VORTEK_AUTO_EXTENSIONS=1\n")
             sb.append("export VORTEK_OPTIMIZE=1\n")
             val vMode = if (vortek != "Disabled") vortek else "VORTEK_AUTO"
@@ -327,10 +332,16 @@ val payload = buildString {
                 sb.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
                 sb.append("export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/gl4es:\$LD_LIBRARY_PATH\n")
             }
-            "ZINK" -> {
-                if (vulkan == "TURNIP") {
+            "ZINK", "VORTEK" -> {
+                sb.append("export VKD3D_FEATURE_LEVEL=12_0\n")
+                sb.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")               
+                sb.append("export GALLIUM_DRIVER=zink\n")
+                sb.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
+            }
+            else -> {
+                if (isVortekActive) {
                     sb.append("export VKD3D_FEATURE_LEVEL=12_0\n")
-                    sb.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")               
+                    sb.append("export MESA_LOADER_DRIVER_OVERRIDE=zink\n")
                     sb.append("export GALLIUM_DRIVER=zink\n")
                     sb.append("export LIBGL_ALWAYS_SOFTWARE=0\n")
                 } else {
@@ -339,12 +350,6 @@ val payload = buildString {
                     sb.append("export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe\n")
                     sb.append("export LIBGL_ALWAYS_SOFTWARE=1\n")
                 }
-            }
-            else -> {
-                sb.append("unset MESA_LOADER_DRIVER_OVERRIDE TU_DEBUG MESA_GL_VERSION_OVERRIDE LIBGL_FB MESA_VK_WSI_PRESENT_MODE VKD3D_FEATURE_LEVEL VN_DEBUG GALLIUM_DRIVER || true\n")
-                sb.append("export GALLIUM_DRIVER=llvmpipe\n")
-                sb.append("export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe\n")
-                sb.append("export LIBGL_ALWAYS_SOFTWARE=1\n")
             }
         }
 
