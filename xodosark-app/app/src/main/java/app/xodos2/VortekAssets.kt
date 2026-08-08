@@ -209,28 +209,57 @@ object VortekAssets {
             val allFiles = vortekDir.listFiles() ?: emptyArray()
             val soFiles = allFiles.filter { it.name.endsWith(".so") }
 
-            // Ensure vulkan.samsung.so is also available as libvulkan_vortek.so
-            val samsungSo = soFiles.find { it.name == "vulkan.samsung.so" }
-            if (samsungSo != null) {
+            // Create driver copies under vortekDir
+            val primarySo = soFiles.find { it.name == "libvulkan_vortek.so" } 
+                ?: soFiles.find { it.name.contains("vortek", ignoreCase = true) }
+                ?: soFiles.find { it.name.contains("samsung", ignoreCase = true) }
+                ?: soFiles.firstOrNull()
+
+            if (primarySo != null) {
                 val vortekTarget = File(vortekDir, "libvulkan_vortek.so")
-                if (!vortekTarget.exists()) {
-                    samsungSo.copyTo(vortekTarget, overwrite = true)
-                }
-            } else if (soFiles.isNotEmpty()) {
-                val primarySo = soFiles.first()
-                val vortekTarget = File(vortekDir, "libvulkan_vortek.so")
-                if (!vortekTarget.exists()) {
+                if (primarySo.absolutePath != vortekTarget.absolutePath) {
                     primarySo.copyTo(vortekTarget, overwrite = true)
                 }
             }
 
-            // Generate vortek_icd.aarch64.json pointing to the Vulkan driver .so
-            val driverSoName = if (File(vortekDir, "vulkan.samsung.so").exists()) "vulkan.samsung.so" else "libvulkan_vortek.so"
+            // Copy layer json and so files first
+            vortekDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(".json") && file.name != "meta.json") {
+                    if (file.name.contains("layer", ignoreCase = true)) {
+                        file.copyTo(File(layerDir1, file.name), overwrite = true)
+                        file.copyTo(File(layerDir2, file.name), overwrite = true)
+                    }
+                } else if (file.name.endsWith(".so")) {
+                    for (dir in libDirs) {
+                        try {
+                            file.copyTo(File(dir, file.name), overwrite = true)
+                        } catch (_: Exception) { }
+                    }
+                    // Also ensure both vulkan.samsung.so and libvulkan_vortek.so exist in all libDirs
+                    if (file.name == "vulkan.samsung.so" || file.name == "libvulkan_vortek.so") {
+                        val altName = if (file.name == "vulkan.samsung.so") "libvulkan_vortek.so" else "vulkan.samsung.so"
+                        for (dir in libDirs) {
+                            try {
+                                file.copyTo(File(dir, altName), overwrite = true)
+                            } catch (_: Exception) { }
+                        }
+                    }
+                }
+            }
+
+            // Clear any old/conflicting ICD json files in all ICD directories
+            listOf(icdDir1, icdDir2, File(rootfs, "vendor/etc/vulkan/icd.d"), File(rootfs, "system/etc/vulkan/icd.d")).forEach { dir ->
+                if (dir.exists()) {
+                    dir.listFiles()?.forEach { it.delete() }
+                }
+            }
+
+            // Generate clean vortek_icd.aarch64.json pointing explicitly to /usr/lib/aarch64-linux-gnu/libvulkan_vortek.so
             val icdJsonContent = """
                 {
                     "file_format_version": "1.0.0",
                     "ICD": {
-                        "library_path": "$driverSoName",
+                        "library_path": "/usr/lib/aarch64-linux-gnu/libvulkan_vortek.so",
                         "api_version": "1.3.0"
                     }
                 }
@@ -238,30 +267,6 @@ object VortekAssets {
 
             File(icdDir1, "vortek_icd.aarch64.json").writeText(icdJsonContent)
             File(icdDir2, "vortek_icd.aarch64.json").writeText(icdJsonContent)
-
-            // Delete any stock/conflicting samsung ICD json files across all ICD directories in rootfs
-            listOf(icdDir1, icdDir2, File(rootfs, "vendor/etc/vulkan/icd.d"), File(rootfs, "system/etc/vulkan/icd.d")).forEach { dir ->
-                if (dir.exists()) {
-                    dir.listFiles()?.filter { it.name.contains("samsung", ignoreCase = true) }?.forEach { it.delete() }
-                }
-            }
-
-            // Copy layer json and so files
-            vortekDir.listFiles()?.forEach { file ->
-                if (file.name.endsWith(".json") && file.name != "meta.json") {
-                    if (file.name.contains("layer", ignoreCase = true)) {
-                        file.copyTo(File(layerDir1, file.name), overwrite = true)
-                        file.copyTo(File(layerDir2, file.name), overwrite = true)
-                    } else if (!file.name.contains("samsung", ignoreCase = true)) {
-                        file.copyTo(File(icdDir1, file.name), overwrite = true)
-                        file.copyTo(File(icdDir2, file.name), overwrite = true)
-                    }
-                } else if (file.name.endsWith(".so")) {
-                    for (dir in libDirs) {
-                        file.copyTo(File(dir, file.name), overwrite = true)
-                    }
-                }
-            }
 
             // Copy libsbwchelper.so, liblog.so and essential Android system/vendor libraries if available to resolve driver dependencies
             val sysVendorSearchPaths = listOf(
