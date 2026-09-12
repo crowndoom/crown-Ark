@@ -1053,37 +1053,39 @@ private fun copyAssetFolderToContainer(
     }
 
     val destRoot = File(rootfs, destDir).apply { mkdirs() }
-    val copied = mutableListOf<String>()
+    var copiedCount = 0
+
+    fun copyOne(assetPath: String, outFile: File) {
+        try {
+            context.assets.open(assetPath).use { input ->
+                FileOutputStream(outFile).use { output ->
+                    input.copyTo(output, 128 * 1024)
+                }
+            }
+            val parentName = outFile.parentFile?.name.orEmpty()
+            val grandName  = outFile.parentFile?.parentFile?.name.orEmpty()
+            if (parentName == "bin" || parentName == "sbin" ||
+                grandName  == "bin" || grandName  == "sbin") {
+                outFile.setExecutable(true, false)
+            }
+            copiedCount++
+        } catch (e: Exception) {
+            Log.e("NativeInstall", "Failed copying asset $assetPath", e)
+        }
+    }
 
     fun walk(assetPath: String, outDir: File) {
-        val children = try {
-            context.assets.list(assetPath) ?: emptyArray()
+        val children: Array<String> = try {
+            context.assets.list(assetPath) ?: emptyArray<String>()
         } catch (e: Exception) {
             Log.e("NativeInstall", "assets.list failed for $assetPath", e)
             return
         }
 
         if (children.isEmpty()) {
-            // It's a file (or empty folder) — copy it
             val outFile = File(outDir, assetPath.substringAfterLast('/'))
-            try {
-                context.assets.open(assetPath).use { input ->
-                    FileOutputStream(outFile).use { output ->
-                        input.copyTo(output, 128 * 1024)
-                    }
-                }
-                // Preserve exec bit for anything under a bin/ dir
-                val parent = outFile.parentFile?.name ?: ""
-                val grand  = outFile.parentFile?.parentFile?.name ?: ""
-                if (parent == "bin" || parent == "sbin" || grand == "bin" || grand == "sbin") {
-                    outFile.setExecutable(true, false)
-                }
-                copied += assetPath
-            } catch (e: Exception) {
-                Log.e("NativeInstall", "Failed copying asset $assetPath", e)
-            }
+            copyOne(assetPath, outFile)
         } else {
-            // It's a directory — recurse
             val subDir = File(outDir, assetPath.substringAfterLast('/')).apply { mkdirs() }
             for (child in children) {
                 walk("$assetPath/$child", subDir)
@@ -1091,27 +1093,24 @@ private fun copyAssetFolderToContainer(
         }
     }
 
-    // Top-level: walk children directly into destRoot
-    val top = context.assets.list(assetDir) ?: emptyArray()
-    if (top.isEmpty()) {
-        // assetDir itself is a file — just copy it
-        val outFile = File(destRoot, assetDir.substringAfterLast('/'))
-        try {
-            context.assets.open(assetDir).use { i ->
-                FileOutputStream(outFile).use { o -> i.copyTo(o, 128 * 1024) }
-            }
-            outFile.setExecutable(true, false)
-            copied += assetDir
-        } catch (e: Exception) {
-            Log.e("NativeInstall", "Failed copying single asset $assetDir", e)
-        }
-    } else {
-        for (child in top) walk("$assetDir/$child", destRoot)
+    val top: Array<String> = try {
+        context.assets.list(assetDir) ?: emptyArray<String>()
+    } catch (e: Exception) {
+        Log.e("NativeInstall", "assets.list failed for $assetDir", e)
+        return
     }
 
-    Log.i("NativeInstall", "Copied ${copied.size} asset(s) from $assetDir → $destRoot")
-}
+    if (top.isEmpty()) {
+        val outFile = File(destRoot, assetDir.substringAfterLast('/'))
+        copyOne(assetDir, outFile)
+    } else {
+        for (child in top) {
+            walk("$assetDir/$child", destRoot)
+        }
+    }
 
+    Log.i("NativeInstall", "Copied $copiedCount asset(s) from $assetDir to $destRoot")
+}
 
 private fun applyNixOsFixes(context: Context, containerId: Int, distroType: String) {
     Log.d("NativeInstall", "applyNixOsFixes called: container=$containerId, distro=$distroType")
