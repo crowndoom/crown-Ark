@@ -40,9 +40,14 @@ impl ApplicationContext {
             native_library_dir,
             external_storage_path,
         };
+
         *APPLICATION_CONTEXT
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {:?}", e))? = Some(ctx);
+
+        // Start native host services immediately after the context exists.
+        spawn_xodos_host_if_present();
+
         Ok(())
     }
 }
@@ -53,6 +58,172 @@ pub fn get_application_context() -> Result<ApplicationContext> {
         .map_err(|e| anyhow::anyhow!("lock poisoned: {:?}", e))?
         .clone()
         .ok_or_else(|| anyhow::anyhow!("ApplicationContext not initialized"))
+}
+
+// --------------------------------------------------------------------------
+// xodos_host – native XoDos host bridge daemon
+// --------------------------------------------------------------------------
+
+static XODOS_HOST_STARTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Start xodos-host automatically and keep it alive.
+/// The function is safe to call multiple times.
+pub fn spawn_xodos_host_if_present() {
+    use std::sync::atomic::Ordering;
+
+    if XODOS_HOST_STARTED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    if let Err(e) = std::thread::Builder::new()
+        .name("xodos-host-supervisor".into())
+        .spawn(xodos_host_supervisor_main)
+    {
+        log::warn!("xodos-host: supervisor thread failed: {:?}", e);
+        XODOS_HOST_STARTED.store(false, Ordering::SeqCst);
+    }
+}
+
+fn xodos_host_supervisor_main() {
+    loop {
+        let Some((exe, home, prefix, log_path)) = prepare_xodos_host() else {
+            // Binary is not installed yet. Keep checking so installing it
+            // later does not require restarting the application.
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            continue;
+        };
+
+        run_xodos_host_until_exit(exe, home, prefix, log_path);
+
+        // If xodos-host exits, automatically start it again.
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+}
+
+fn prepare_xodos_host() -> Option<(PathBuf, PathBuf, PathBuf, PathBuf)> {
+    let ctx = get_application_context().ok()?;
+
+    // Adjust/add candidates here if your binary is stored elsewhere.
+    let candidates = [
+        ctx.data_dir.join("usr/bin/xodos-host"),
+        ctx.data_dir.join("bin/xodos-host"),
+        ctx.native_library_dir.join("xodos-host"),
+        ctx.data_dir.join("xodos-host"),
+    ];
+
+    let exe = candidates.iter().find(|p| p.is_file())?.clone();
+
+    let home = ctx.data_dir.join("home");
+    let prefix = ctx.data_dir.join("usr");
+    let runtime = ctx.data_dir.join("xrun");
+
+    let _ = std::fs::create_dir_all(&runtime);
+
+    let log_path = runtime.join("xodos-host.log");
+
+    Some((exe, home, prefix, log_path))
+}
+
+fn run_xodos_host_until_exit(
+    exe: PathBuf,
+    home: PathBuf,
+    prefix: PathBuf,
+    log_path: PathBuf,
+) {
+    let log_file = match OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            log::warn!("xodos-host: cannot open log {:?}: {:?}", log_path, e);
+            return;
+        }
+    };
+
+    let _ = writeln!(
+        &log_file,
+        "\n--- xodos-host start {:?} exe={:?} ---",
+        std::time::SystemTime::now(),
+        exe
+    );
+
+    let stderr = match log_file.try_clone() {
+        Ok(f) => std::process::Stdio::from(f),
+        Err(_) => std::process::Stdio::null(),
+    };
+
+    let stdout = match log_file.try_clone() {
+        Ok(f) => std::process::Stdio::from(f),
+        Err(_) => std::process::Stdio::null(),
+    };
+
+    use std::process::Command;
+
+    // xodos-host is a native Android/Bionic executable.
+    // When it lives under app-private /files/, invoke it through
+    // Android's native linker.
+    let mut cmd = if exec_from_app_data(&exe) {
+        let mut c = Command::new(linker());
+        c.arg(&exe);
+        c
+    } else {
+        Command::new(&exe)
+    };
+
+    cmd.env("HOME", &home)
+        .env("PREFIX", &prefix)
+        .env("PATH", format!(
+            "{}/bin:/system/bin:/system/xbin",
+            prefix.display()
+        ))
+        // Do not inherit an environment that could interfere with
+        // native Bionic loading.
+        .env_remove("LD_PRELOAD")
+        .env_remove("LD_LIBRARY_PATH")
+        .stdin(std::process::Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr);
+
+    log::info!("xodos-host: starting {:?}", exe);
+
+    match cmd.spawn() {
+        Ok(mut child) => {
+            let pid = child.id();
+
+            log::info!("xodos-host: started pid={}", pid);
+
+            match child.wait() {
+                Ok(status) => {
+                    log::warn!(
+                        "xodos-host: pid={} exited with {}",
+                        pid,
+                        status
+                    );
+                }
+                Err(e) => {
+                    log::warn!(
+                        "xodos-host: pid={} wait failed: {:?}",
+                        pid,
+                        e
+                    );
+                }
+            }
+        }
+
+        Err(e) => {
+            log::warn!(
+                "xodos-host: failed to spawn {:?}: {:?}",
+                exe,
+                e
+            );
+        }
+    }
 }
 
 // ---------- Container helpers ----------
