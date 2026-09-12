@@ -818,7 +818,7 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
         )
         if (ok) {
             configureDns(context, containerId)      
-            //copyAssetToContainer(context, containerId, "xfce4-fix.zip")       
+            copyAssetFolderToContainer(context, containerId, "usr/bin")
             val detected = detectDistroFromRootfs(context, containerId) ?: distro.distroType
             writeContainerEnvironment(context, containerId, detected)
             applyProotBypasses(context, containerId, detected)
@@ -871,7 +871,7 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
 
         if (ok) {
             configureDns(context, containerId)
-            //copyAssetToContainer(context, containerId, "xfce4-fix.zip") 
+            copyAssetFolderToContainer(context, containerId, "usr/bin")
             val detected = detectDistroFromRootfs(context, containerId) ?: "linux"
             writeContainerEnvironment(context, containerId, detected)
             applyProotBypasses(context, containerId, detected)
@@ -970,6 +970,7 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             "libxz.so"          to "xz",
             "libpv.so"          to "pv",
             "libgzip.so"        to "gzip"
+            "libxodosh.so"          to "xodos-host",
         )
         for ((target, linkName) in symlinks) {
             val targetPath = "$nativeLibDir/$target"
@@ -1030,21 +1031,85 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
 /**
  * Copies an asset file from the APK into the container's root directory.
  */
-private fun copyAssetToContainer(context: Context, containerId: Int, assetName: String) {
+/**
+ * Recursively copies a folder from APK assets into the container rootfs.
+ * - Creates nested directories as needed
+ * - Overwrites existing files (merge, not replace-all)
+ * - Preserves executable bit on files under bin/, sbin/, usr/bin/, usr/sbin/
+ *
+ * @param assetDir  path inside assets/, e.g. "usr/bin/xrun"
+ * @param destDir   destination folder inside the rootfs; defaults to assetDir
+ */
+private fun copyAssetFolderToContainer(
+    context: Context,
+    containerId: Int,
+    assetDir: String,
+    destDir: String = assetDir
+) {
     val rootfs = containerPath(context, containerId)
-    if (!rootfs.isDirectory) return
+    if (!rootfs.isDirectory) {
+        Log.w("NativeInstall", "copyAssetFolder: container $containerId missing")
+        return
+    }
 
-    val destFile = File(rootfs, assetName)
-    try {
-        context.assets.open(assetName).use { input ->
-            FileOutputStream(destFile).use { output ->
-                input.copyTo(output)
+    val destRoot = File(rootfs, destDir).apply { mkdirs() }
+    val copied = mutableListOf<String>()
+
+    fun walk(assetPath: String, outDir: File) {
+        val children = try {
+            context.assets.list(assetPath) ?: emptyArray()
+        } catch (e: Exception) {
+            Log.e("NativeInstall", "assets.list failed for $assetPath", e)
+            return
+        }
+
+        if (children.isEmpty()) {
+            // It's a file (or empty folder) — copy it
+            val outFile = File(outDir, assetPath.substringAfterLast('/'))
+            try {
+                context.assets.open(assetPath).use { input ->
+                    FileOutputStream(outFile).use { output ->
+                        input.copyTo(output, 128 * 1024)
+                    }
+                }
+                // Preserve exec bit for anything under a bin/ dir
+                val parent = outFile.parentFile?.name ?: ""
+                val grand  = outFile.parentFile?.parentFile?.name ?: ""
+                if (parent == "bin" || parent == "sbin" || grand == "bin" || grand == "sbin") {
+                    outFile.setExecutable(true, false)
+                }
+                copied += assetPath
+            } catch (e: Exception) {
+                Log.e("NativeInstall", "Failed copying asset $assetPath", e)
+            }
+        } else {
+            // It's a directory — recurse
+            val subDir = File(outDir, assetPath.substringAfterLast('/')).apply { mkdirs() }
+            for (child in children) {
+                walk("$assetPath/$child", subDir)
             }
         }
-        Log.i("NativeInstall", "$assetName copied to container $containerId")
-    } catch (e: Exception) {
-        Log.e("NativeInstall", "Failed to copy $assetName to container $containerId", e)
     }
+
+    // Top-level: walk children directly into destRoot
+    val top = context.assets.list(assetDir) ?: emptyArray()
+    if (top.isEmpty()) {
+        // assetDir itself is a file — just copy it
+        val outFile = File(destRoot, assetDir.substringAfterLast('/'))
+        try {
+            context.assets.open(assetDir).use { i ->
+                FileOutputStream(outFile).use { o -> i.copyTo(o, 128 * 1024) }
+            }
+            outFile.setExecutable(true, false)
+            copied += assetDir
+        } catch (e: Exception) {
+            Log.e("NativeInstall", "Failed copying single asset $assetDir", e)
+        }
+    } else {
+        for (child in top) walk("$assetDir/$child", destRoot)
+    }
+
+    Log.i("NativeInstall", "Copied ${copied.size} asset(s) from $assetDir → $destRoot")
 }
 
 
