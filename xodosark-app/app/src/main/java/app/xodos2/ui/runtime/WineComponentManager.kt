@@ -26,7 +26,7 @@ object WineComponentManager {
 
     /** Default Wine prefix; override if yours lives elsewhere. */
     fun defaultWinePrefix(context: Context): File =
-        File(context.filesDir, "home/.wine")
+        File(context.filesDir, "home/.wine/drive_c/windows/")
 
     // ─────────────── Scanning ───────────────
 
