@@ -1,5 +1,6 @@
 package app.xodos2.ui.drawer.pages
 
+import app.xodos2.ui.drawer.pages.DxvkSelectorSection   
 import android.content.SharedPreferences
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -304,7 +305,12 @@ DesktopLaunchersSection(
         prefs = prefs,
         onExecuteCommand = onExecuteCommand
     )
-
+    
+DxvkSelectorSection(
+        category = "d3d",
+        title = "D3D Components (DXVK)",
+        enabled = true
+    )
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
                     val prefKey = "custom_install_script_${distroId}_${name.replace(" ", "_")}"
