@@ -574,6 +574,43 @@ private fun writeNativeWrapper(context: Context) {
     }
 }
 
+/**
+ * Rewrites every `Exec=` line in native-side .desktop launchers so the command
+ * is prefixed with `xrun`. Idempotent — safe to run repeatedly.
+ *
+ * Targets (native files, NOT inside any container rootfs):
+ *   <filesDir>/home/Desktop
+ *   <filesDir>/usr/share/applications
+ */
+private fun applyDesktopExecRewrite(context: Context) {
+    val homeDesktop = File(context.filesDir, "home/Desktop")
+    val shareApps   = File(context.filesDir, "usr/share/applications")
+
+    // Native paths are absolute and outside the container, so no rootfs prefix.
+    // \\2 in Kotlin → \2 in the shell string → sed back-reference to group 2.
+    val cmd = """
+        for d in "${homeDesktop.absolutePath}" "${shareApps.absolutePath}"; do
+            [ -d "${'$'}d" ] || continue
+            find "${'$'}d" -type f -name '*.desktop' -exec \
+                sed -i -E 's|^Exec=(xrun )?(.*)|Exec=xrun \\2|' {} +
+        done
+    """.trimIndent()
+
+    try {
+        val pb = ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true)
+        val p  = pb.start()
+        val out = p.inputStream.bufferedReader().use { it.readText() }
+        val exit = p.waitFor()
+        if (exit == 0) {
+            Log.i("NativeInstall", "Rewrote Exec= in native .desktop launchers")
+        } else {
+            Log.w("NativeInstall", "desktop exec rewrite exit=$exit out=$out")
+        }
+    } catch (e: Exception) {
+        Log.e("NativeInstall", "desktop exec rewrite failed", e)
+    }
+}
+
     fun saveContainerDistro(context: Context, containerId: Int, distroId: String) {
         context.getSharedPreferences("xodos2_containers", Context.MODE_PRIVATE)
             .edit()
@@ -826,6 +863,7 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             applyArchPacmanFixes(context, containerId, detected)
             applyNixOsFixes(context, containerId, detected)    
             writeNativeWrapper(context)
+            applyDesktopExecRewrite(context) 
         }
         ok
     }
@@ -879,6 +917,7 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             applyArchPacmanFixes(context, containerId, detected)
             applyNixOsFixes(context, containerId, detected)    
             writeNativeWrapper(context)
+            applyDesktopExecRewrite(context) 
         }
         ok
     }
