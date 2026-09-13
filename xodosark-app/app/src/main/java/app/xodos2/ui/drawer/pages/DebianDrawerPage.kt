@@ -1,5 +1,7 @@
 package app.xodos2.ui.drawer.pages
 
+import app.xodos2.ui.drawer.pages.DxvkSelectorSection
+import app.xodos2.ui.drawer.pages.HudSelectorSection
 import android.content.SharedPreferences
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -243,6 +245,14 @@ fun DebianDrawerPage(
         onExecuteCommand = onExecuteCommand
     )
 
+DxvkSelectorSection(
+        category = "d3d",
+        title = "D3D Components (DXVK)",
+        enabled = true
+    )
+    HudSelectorSection(
+        title = "HUD"
+    )
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
                     val prefKey = "custom_install_script_${distroId}_${name.replace(" ", "_")}"

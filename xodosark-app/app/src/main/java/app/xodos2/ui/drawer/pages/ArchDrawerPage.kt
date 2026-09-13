@@ -1,6 +1,7 @@
 package app.xodos2.ui.drawer.pages
 
-import app.xodos2.ui.drawer.pages.DxvkSelectorSection   
+import app.xodos2.ui.drawer.pages.DxvkSelectorSection
+import app.xodos2.ui.drawer.pages.HudSelectorSection
 import android.content.SharedPreferences
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -310,6 +311,10 @@ DxvkSelectorSection(
         category = "d3d",
         title = "D3D Components (DXVK)",
         enabled = true
+    )
+    
+    HudSelectorSection(
+        title = "HUD"
     )
             DrawerExpandableSection(title = "Install Desktop", defaultExpanded = false) {
                 desktopEnvNames.forEach { name ->
