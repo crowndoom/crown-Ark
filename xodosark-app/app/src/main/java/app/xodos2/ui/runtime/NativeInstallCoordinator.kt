@@ -969,8 +969,8 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             "libproot.so"       to "proot",
             "libxz.so"          to "xz",
             "libpv.so"          to "pv",
-            "libgzip.so"        to "gzip"
-            "libxodosh.so"          to "xodos-host",
+            "libgzip.so"        to "gzip",
+            "libxodosh.so"          to "xodos-host"
         )
         for ((target, linkName) in symlinks) {
             val targetPath = "$nativeLibDir/$target"
