@@ -138,20 +138,19 @@ Include = /etc/pacman.d/mirrorlist
 // $PREFIX/bin/nt — native wrapper, written on every distro install
 private val NATIVE_WRAPPER_SCRIPT = """
 #!/data/data/app.xodos2/files/usr/bin/sh
-
+export PULSE_SERVER=127.0.0.1
 export PREFIX="/data/data/app.xodos2/files/usr"
 export HOME="/data/data/app.xodos2/files/home"
 export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
 export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
 #export LD_PRELOAD="${'$'}PREFIX/lib/libtermux-exec-ld-preload.so"
 export SHELL=/data/data/app.xodos2/files/usr/bin/bash
+. ${'$'}PREFIX/opt/drv
 export PATH="${'$'}PREFIX/bin"
 export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
 #export LD_PRELOAD=${'$'}PREFIX/lib/libtermux-exec-ld-preload.so
-
 export DISPLAY="${'$'}{DISPLAY:-:0}"
 
-. ${'$'}PREFIX/opt/drv
 
 exec "${'$'}@"
 
@@ -574,42 +573,7 @@ private fun writeNativeWrapper(context: Context) {
     }
 }
 
-/**
- * Rewrites every `Exec=` line in native-side .desktop launchers so the command
- * is prefixed with `xrun`. Idempotent — safe to run repeatedly.
- *
- * Targets (native files, NOT inside any container rootfs):
- *   <filesDir>/home/Desktop
- *   <filesDir>/usr/share/applications
- */
-private fun applyDesktopExecRewrite(context: Context) {
-    val homeDesktop = File(context.filesDir, "home/Desktop")
-    val shareApps   = File(context.filesDir, "usr/share/applications")
 
-    // Native paths are absolute and outside the container, so no rootfs prefix.
-    // \\2 in Kotlin → \2 in the shell string → sed back-reference to group 2.
-    val cmd = """
-        for d in "${homeDesktop.absolutePath}" "${shareApps.absolutePath}"; do
-            [ -d "${'$'}d" ] || continue
-            find "${'$'}d" -type f -name '*.desktop' -exec \
-                sed -i -E 's|^Exec=(xrun )?(.*)|Exec=xrun \\2|' {} +
-        done
-    """.trimIndent()
-
-    try {
-        val pb = ProcessBuilder("/system/bin/sh", "-c", cmd).redirectErrorStream(true)
-        val p  = pb.start()
-        val out = p.inputStream.bufferedReader().use { it.readText() }
-        val exit = p.waitFor()
-        if (exit == 0) {
-            Log.i("NativeInstall", "Rewrote Exec= in native .desktop launchers")
-        } else {
-            Log.w("NativeInstall", "desktop exec rewrite exit=$exit out=$out")
-        }
-    } catch (e: Exception) {
-        Log.e("NativeInstall", "desktop exec rewrite failed", e)
-    }
-}
 
     fun saveContainerDistro(context: Context, containerId: Int, distroId: String) {
         context.getSharedPreferences("xodos2_containers", Context.MODE_PRIVATE)
@@ -863,7 +827,6 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             applyArchPacmanFixes(context, containerId, detected)
             applyNixOsFixes(context, containerId, detected)    
             writeNativeWrapper(context)
-            applyDesktopExecRewrite(context) 
         }
         ok
     }
@@ -917,7 +880,6 @@ suspend fun cleanCacheTarballs(context: Context): Boolean =
             applyArchPacmanFixes(context, containerId, detected)
             applyNixOsFixes(context, containerId, detected)    
             writeNativeWrapper(context)
-            applyDesktopExecRewrite(context) 
         }
         ok
     }
