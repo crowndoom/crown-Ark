@@ -1110,7 +1110,7 @@ fun downloadFullDesktopGUIArchive() {
         try {
             withContext(Dispatchers.IO) {
                 // ★ REPLACE with the actual URL for the full desktop GUI archive
-                val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/v0.6.3-full/ark.tar.xz")
+                val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/v0.6.3-full/ark2.tar.xz")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 15_000
