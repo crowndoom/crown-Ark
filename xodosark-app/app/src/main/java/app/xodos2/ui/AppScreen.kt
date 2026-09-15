@@ -63,6 +63,7 @@ import app.xodos2.shell.ShellFonts
 import app.xodos2.ui.dialog.MOUSE_MODE_TABLET
 import app.xodos2.ui.dialog.MOUSE_MODE_TOUCHPAD
 import app.xodos2.ui.drawer.AppDrawer
+import app.xodos2.ui.drawer.VoipDrawerBottomBar
 import app.xodos2.ui.drawer.pages.*
 import app.xodos2.ui.orb.FloatingMenuOrb
 import app.xodos2.ui.prefs.AppPrefs
@@ -1110,7 +1111,7 @@ fun downloadFullDesktopGUIArchive() {
         try {
             withContext(Dispatchers.IO) {
                 // ★ REPLACE with the actual URL for the full desktop GUI archive
-                val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/v0.6.3-full/ark2.tar.xz")
+                val url = URL("https://github.com/xodiosx/XoDos-Ark/releases/download/v0.6.3-full/ark.tar.xz")
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 15_000
@@ -3178,9 +3179,9 @@ if (showDistroSelection) {
         drawerState = drawerState,
         isBackgroundBlurred = isAnyDialogVisible,
         drawerContent = {
-      
-
-            DrawerPagedHost(
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    DrawerPagedHost(
     archContent = {
         ArchDrawerPage(
             prefs = prefs,
@@ -3358,8 +3359,13 @@ if (showDistroSelection) {
         )
     }
 )
-            
-            
+                }
+                VoipDrawerBottomBar(
+                    onSendToTerminal = { text ->
+                        NativeBridge.writeInput(terminalSessionState.activeSessionId, text.toByteArray())
+                    }
+                )
+            }
         },
         
         
